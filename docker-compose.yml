@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: pharmashield
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.4
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      QDRANT_URL: ${QDRANT_URL}
+      REDIS_URL: ${REDIS_URL}
+      APP_ENV: ${APP_ENV}
+      LLM_PROVIDER: ${LLM_PROVIDER}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+      ENABLE_LIVE_PUBLIC_APIS: ${ENABLE_LIVE_PUBLIC_APIS}
+      ENABLE_SYNTHETIC_DATA: ${ENABLE_SYNTHETIC_DATA}
+      MAX_RETRIEVED_CHUNKS: ${MAX_RETRIEVED_CHUNKS}
+      MAX_RERANKED_CHUNKS: ${MAX_RERANKED_CHUNKS}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    depends_on:
+      - postgres
+      - qdrant
+      - redis
+    ports:
+      - "${BACKEND_PORT}:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT}:3000"
+
+volumes:
+  postgres_data:
+  qdrant_data:

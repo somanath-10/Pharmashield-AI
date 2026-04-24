@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(245, 143, 116, 0.24), transparent 32%),
+    radial-gradient(circle at right center, rgba(200, 242, 212, 0.26), transparent 28%),
+    linear-gradient(180deg, #fffdf8 0%, #f6efe3 100%);
+  color: #111827;
+  font-family: "Avenir Next", "Trebuchet MS", sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Iowan Old Style", "Palatino Linotype", serif;
+}
+
+textarea {
+  resize: vertical;
+}

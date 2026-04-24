@@ -1,0 +1,10 @@
+.env
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+backend/.venv/
+backend/pharmashield.db
+backend/storage/uploads/*
+frontend/.next/
+frontend/node_modules/
