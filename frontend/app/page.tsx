@@ -1,116 +1,124 @@
-"use client";
+import Link from 'next/link';
 
-import Link from "next/link";
-import { MoveRight, Zap, CheckCircle2, ShieldAlert, BadgeInfo } from "lucide-react";
-import { motion } from "framer-motion";
-
-import { CaseInput } from "@/components/CaseInput";
-import { Card } from "@/components/ui/card";
-
-const modules = [
+const roles = [
   {
-    title: "Availability & Substitution",
-    detail: "Real-time inventory analysis and compliant generic molecule substitution matching.",
-    icon: <Zap className="w-6 h-6 text-sky-400" />,
-    color: "from-sky-500/20 to-transparent",
-    borderColor: "border-sky-500/20"
+    title: 'Patient',
+    path: '/patient',
+    icon: '👤',
+    cls: 'patient',
+    badge: { bg: 'rgba(16,185,129,0.12)', color: '#34d399', label: 'Patient' },
+    description: 'Upload prescriptions and lab reports. Get simple, safe explanations in plain language.',
+    features: ['Prescription explanation', 'Lab report summary', 'Doctor Q&A checklist'],
   },
   {
-    title: "Price & Jan Aushadhi",
-    detail: "Direct NPPA compliance checks and Jan Aushadhi Kendra affordability assessment.",
-    icon: <CheckCircle2 className="w-6 h-6 text-emerald-400" />,
-    color: "from-emerald-500/20 to-transparent",
-    borderColor: "border-emerald-500/20"
+    title: 'Pharmacist',
+    path: '/pharmacist',
+    icon: '💊',
+    cls: 'pharmacist',
+    badge: { bg: 'rgba(59,130,246,0.12)', color: '#60a5fa', label: 'Pharmacist' },
+    description: 'Verify prescriptions, check Schedule H/X compliance, and explore therapeutic substitutions.',
+    features: ['Dispensing compliance', 'Schedule H/X check', 'Counseling points'],
   },
   {
-    title: "Quality & Compliance",
-    detail: "Automated CDSCO NSQ alert tracking and Schedule H/H1/X compliance validation.",
-    icon: <ShieldAlert className="w-6 h-6 text-rose-400" />,
-    color: "from-rose-500/20 to-transparent",
-    borderColor: "border-rose-500/20"
-  }
+    title: 'Doctor',
+    path: '/doctor',
+    icon: '🩺',
+    cls: 'doctor',
+    badge: { bg: 'rgba(99,102,241,0.12)', color: '#a5b4fc', label: 'Doctor' },
+    description: 'Get summarized patient case highlights from uploaded documents and lab reports.',
+    features: ['Clinical summary', 'Lab abnormalities', 'Follow-up checklist'],
+  },
+  {
+    title: 'Admin',
+    path: '/admin',
+    icon: '⚙️',
+    cls: 'admin',
+    badge: { bg: 'rgba(245,158,11,0.12)', color: '#fbbf24', label: 'Admin' },
+    description: 'Monitor case workflows, high-risk flags, and system-wide usage analytics.',
+    features: ['Case tracking', 'Risk monitoring', 'Role analytics'],
+  },
 ];
 
-export default function HomePage() {
+export default function RoleSelection() {
   return (
-    <main className="space-y-16">
-      {/* Hero Section */}
-      <section className="relative py-12 px-2">
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-sky-500/10 rounded-full blur-[100px] pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
-        
-        <div className="max-w-4xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-bold uppercase tracking-widest mb-6">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
-            </span>
-            Memory-Aware Agentic RAG
-          </div>
-          
-          <h1 className="text-6xl md:text-7xl font-extrabold text-white leading-[1.1] tracking-tight">
-            Advanced Intelligence for <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-indigo-400 to-purple-400">
-              Indian Pharmacy Operations
-            </span>
-          </h1>
-          
-          <p className="mt-8 text-xl text-slate-400 leading-relaxed max-w-2xl font-medium">
-            Empower your pharmacy team with AI agents that handle availability, affordability, 
-            and complex CDSCO quality alerts with verifiable evidence.
-          </p>
-          
-          <div className="mt-10 flex flex-wrap gap-4">
-            <Link
-              href="#case-analyzer"
-              className="px-8 py-4 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-2xl transition-all shadow-lg shadow-sky-500/25 flex items-center gap-2 group"
-            >
-              Analyze New Case
-              <MoveRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <Link
-              href="/dashboard"
-              className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-2xl transition-all border border-white/5"
-            >
-              System Dashboard
-            </Link>
-          </div>
+    <div>
+      {/* Hero */}
+      <div style={{ textAlign: 'center', marginBottom: '56px' }}>
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '8px',
+          background: 'rgba(59,130,246,0.1)',
+          border: '1px solid rgba(59,130,246,0.2)',
+          borderRadius: '999px',
+          padding: '6px 18px',
+          fontSize: '0.8rem',
+          color: '#60a5fa',
+          fontWeight: 600,
+          marginBottom: '24px',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+        }}>
+          <span>🇮🇳</span> India-First Healthcare AI
         </div>
-      </section>
+        <h1 style={{
+          fontSize: 'clamp(2rem, 5vw, 3rem)',
+          fontWeight: 900,
+          lineHeight: 1.15,
+          background: 'linear-gradient(135deg, #f0f6ff 30%, #94a3b8)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          marginBottom: '16px',
+        }}>
+          PharmaShield India AI
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '560px', margin: '0 auto', lineHeight: 1.6 }}>
+          Role-based AI assistant for patients, doctors, and pharmacists — safe, simple, and regulatory-aligned.
+        </p>
+      </div>
 
-      {/* Modules Feed */}
-      <section className="grid gap-6 md:grid-cols-3">
-        {modules.map((module, index) => (
-          <div
-            key={module.title}
-            className={`glass-panel p-8 rounded-[2.5rem] card-hover border border-white/5 relative overflow-hidden group`}
-          >
-            <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${module.color} blur-[40px] opacity-50`} />
-            <div className="relative z-10">
-              <div className="mb-6 p-4 rounded-2xl bg-slate-900/50 w-fit border border-white/5">
-                {module.icon}
+      {/* Role Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px' }}>
+        {roles.map((role) => (
+          <Link key={role.title} href={role.path} style={{ textDecoration: 'none' }}>
+            <div className={`role-card ${role.cls}`} style={{ height: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <span style={{ fontSize: '2.4rem' }}>{role.icon}</span>
+                <span style={{
+                  background: role.badge.bg,
+                  color: role.badge.color,
+                  borderRadius: '999px',
+                  padding: '3px 12px',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}>{role.badge.label}</span>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-4">{module.title}</h2>
-              <p className="text-slate-400 leading-relaxed text-sm font-medium">{module.detail}</p>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+                {role.title}
+              </h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.6, marginBottom: '16px' }}>
+                {role.description}
+              </p>
+              <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {role.features.map((f) => (
+                  <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    <span style={{ color: role.badge.color, fontSize: '0.7rem' }}>✦</span> {f}
+                  </li>
+                ))}
+              </ul>
             </div>
-            <div className={`absolute bottom-6 right-8 text-[100px] font-black text-white/[0.03] select-none pointer-events-none`}>
-              0{index + 1}
-            </div>
-          </div>
+          </Link>
         ))}
-      </section>
+      </div>
 
-      {/* Analyzer Section */}
-      <section id="case-analyzer" className="relative pt-10">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-        <div className="flex flex-col items-center mb-12 text-center">
-            <h2 className="text-4xl font-bold text-white mb-4">Case Analyzer Engine</h2>
-            <p className="text-slate-500 text-lg max-w-xl">
-                Submit a pharmacy query to trigger coordinated agent research through current CDSCO, NPPA, and Jan Aushadhi data stores.
-            </p>
-        </div>
-        <CaseInput />
-      </section>
-    </main>
+      {/* Bottom notice */}
+      <div style={{ textAlign: 'center', marginTop: '48px' }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+          All AI outputs include mandatory professional review prompts. This is a decision-support tool, not a replacement for clinical judgment.
+        </p>
+      </div>
+    </div>
   );
 }

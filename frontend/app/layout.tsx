@@ -1,73 +1,50 @@
-import type { Metadata } from "next";
-import Link from "next/link";
-import type { ReactNode } from "react";
-import { Shield, LayoutDashboard, History, Database } from "lucide-react";
+import './globals.css'
+import { Inter } from 'next/font/google'
 
-import { Providers } from "@/app/providers";
-import "@/app/globals.css";
+const inter = Inter({ subsets: ['latin'] })
 
-export const metadata: Metadata = {
-  title: "PharmaShield India AI",
-  description: "Advanced Indian pharmacy operations intelligence platform."
-};
-
-export default function RootLayout({
-  children
-}: Readonly<{
-  children: ReactNode;
-}>) {
-  return (
-    <html lang="en" className="dark">
-      <body className="antialiased">
-        <Providers>
-          <div className="mx-auto min-h-screen max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
-            <header className="glass-panel mb-12 flex flex-col gap-6 rounded-3xl p-6 md:flex-row md:items-center md:justify-between border border-white/5">
-              <Link href="/" className="flex items-center gap-3 group transition-all">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-500 shadow-lg shadow-sky-500/20 group-hover:scale-105 transition-transform">
-                  <Shield className="h-7 w-7 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold tracking-tight text-white">
-                    PharmaShield <span className="text-sky-400">India AI</span>
-                  </h1>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                    Operations Intelligence Platform
-                  </p>
-                </div>
-              </Link>
-
-              <nav className="flex flex-wrap items-center gap-2 p-1 rounded-2xl bg-slate-900/50 border border-white/5">
-                <NavLink href="/" icon={<History className="w-4 h-4" />} label="Home" />
-                <NavLink href="/cases" icon={<History className="w-4 h-4" />} label="Cases" />
-                <NavLink href="/dashboard" icon={<LayoutDashboard className="w-4 h-4" />} label="Dashboard" />
-                <NavLink href="/ingest" icon={<Database className="w-4 h-4" />} label="Manage Data" />
-              </nav>
-            </header>
-            
-            <div className="relative">
-              {children}
-            </div>
-            
-            <footer className="mt-20 py-8 border-t border-white/5 text-center">
-              <p className="text-sm text-slate-500 font-medium tracking-wide">
-                &copy; 2026 PharmaShield India AI. Verified Decision Support Tool.
-              </p>
-            </footer>
-          </div>
-        </Providers>
-      </body>
-    </html>
-  );
+export const metadata = {
+  title: 'PharmaShield India AI',
+  description: 'Role-Based AI Assistant for Patients, Doctors, and Pharmacists',
 }
 
-function NavLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <Link 
-      href={href} 
-      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-all active:scale-95"
-    >
-      {icon}
-      {label}
-    </Link>
-  );
+    <html lang="en">
+      <body className={inter.className}>
+        <nav style={{
+          background: 'rgba(10,15,30,0.8)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
+          padding: '0 32px',
+          height: '60px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '1.4rem' }}>🛡️</span>
+            <span style={{ fontWeight: 800, fontSize: '1.05rem', background: 'linear-gradient(135deg, #60a5fa, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              PharmaShield India AI
+            </span>
+          </div>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+            Role-Based Healthcare Assistant
+          </span>
+        </nav>
+
+        <main style={{ maxWidth: '1080px', margin: '0 auto', padding: '40px 24px' }}>
+          {children}
+        </main>
+      </body>
+    </html>
+  )
 }

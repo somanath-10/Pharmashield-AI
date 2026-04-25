@@ -1,47 +1,37 @@
-from __future__ import annotations
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Optional
 
-from pathlib import Path
+from app.models.domain import UserDocument, DocumentTypeEnum, Case
+from app.schemas.case import DocumentUploadResponse
 
-from fastapi import APIRouter, Depends, File, UploadFile
-from sqlalchemy.orm import Session
+router = APIRouter(prefix="/api/cases", tags=["documents"])
 
-from app.core.config import get_settings
-from app.db.models import EvidenceChunk
-from app.db.session import get_db
-from app.schemas.document import DocumentUploadResponse
-from app.services.rag.chunking import chunk_section_aware_text, parse_uploaded_document
-from app.services.rag.vector_store import VectorStore
+class MockUploadRequest(BaseModel):
+    document_type: DocumentTypeEnum
+    file_name: str
+    mock_extracted_text: str
 
-router = APIRouter(prefix="/api/documents", tags=["documents"])
-
-
-@router.post("/upload", response_model=DocumentUploadResponse)
-async def upload_document(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-) -> DocumentUploadResponse:
-    settings = get_settings()
-    settings.upload_path.mkdir(parents=True, exist_ok=True)
-    destination = settings.upload_path / file.filename
-    raw_bytes = await file.read()
-    destination.write_bytes(raw_bytes)
-    text = parse_uploaded_document(Path(destination), file.content_type or "text/plain", raw_bytes)
-    chunks = chunk_section_aware_text(
-        text,
-        source_type="uploaded_document",
-        source_name="Uploaded document",
-        source_url=None,
-        document_title=file.filename,
-        default_section="general",
-        extra_metadata={"source": "internal_sop"},
+@router.post("/{case_id}/documents", response_model=DocumentUploadResponse)
+async def upload_mock_document(case_id: str, request: MockUploadRequest) -> DocumentUploadResponse:
+    # 1. Verify case
+    target_case = await Case.find_one(Case.case_id == case_id)
+    if not target_case:
+        raise HTTPException(status_code=404, detail="Case not found")
+        
+    # 2. Save document record
+    doc = UserDocument(
+        case_id=case_id,
+        user_id=target_case.user_id,
+        document_type=request.document_type,
+        file_name=request.file_name,
+        text_content=request.mock_extracted_text
     )
-    vector_store = VectorStore()
-    for payload in chunks:
-        vector_store.upsert_text(db, EvidenceChunk(**payload))
-    db.commit()
+    await doc.insert()
+    
     return DocumentUploadResponse(
-        filename=file.filename,
-        content_type=file.content_type or "application/octet-stream",
-        chunks_indexed=len(chunks),
-        message="Document indexed successfully.",
+        document_id=doc.document_id,
+        file_name=doc.file_name,
+        status="MOCK_UPLOADED",
+        extracted_text_preview=doc.text_content[:100] + "..." if doc.text_content else None
     )

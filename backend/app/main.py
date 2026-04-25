@@ -9,17 +9,15 @@ from app.api.routes.cases import router as cases_router
 from app.api.routes.documents import router as documents_router
 from app.api.routes.feedback import router as feedback_router
 from app.api.routes.health import router as health_router
-from app.api.routes.ingest import router as ingest_router
-from app.api.routes.memory import router as memory_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
-from app.db.session import init_db
+from app.db.mongodb import init_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
-    init_db()
+    await init_db()
     yield
 
 
@@ -37,6 +35,4 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(cases_router)
 app.include_router(documents_router)
-app.include_router(ingest_router)
 app.include_router(feedback_router)
-app.include_router(memory_router)

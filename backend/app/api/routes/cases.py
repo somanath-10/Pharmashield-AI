@@ -1,80 +1,92 @@
-from __future__ import annotations
-
 import json
+from typing import List
+from fastapi import APIRouter, HTTPException
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-
-from app.db.models import Feedback, PharmacyCase
-from app.db.session import get_db
+from app.models.domain import Case, RoleEnum, UserDocument, AgentRun
 from app.schemas.case import (
-    CaseAnalyzeRequest,
-    CaseAnalyzeResponse,
-    CaseListItem,
+    CaseCreateRequest,
     CaseRecordResponse,
-    DashboardSummary,
+    CaseAnalyzeResponse,
+    DocumentUploadResponse
 )
-from app.services.agents.coordinator import AgentCoordinator
+from app.services.agents.patient_agent import PatientAgent
+from app.services.agents.pharmacist_agent import PharmacistAgent
+from app.services.agents.doctor_agent import DoctorAgent
+from app.services.agents.admin_agent import AdminAgent
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 
-
-@router.post("/analyze", response_model=CaseAnalyzeResponse)
-async def analyze_case(request: CaseAnalyzeRequest, db: Session = Depends(get_db)) -> CaseAnalyzeResponse:
-    coordinator = AgentCoordinator(db)
-    return await coordinator.analyze_case(request)
-
-
-@router.get("/dashboard/summary", response_model=DashboardSummary)
-def dashboard_summary(db: Session = Depends(get_db)) -> DashboardSummary:
-    cases = db.query(PharmacyCase).all()
-    feedback_items = db.query(Feedback).all()
-    risk_counts = {"LOW": 0, "MEDIUM": 0, "HIGH": 0, "CRITICAL": 0}
-    compliance_issues: dict[str, int] = {}
-    shortage_cases = 0
-    supplier_risk_cases = 0
-    for case in cases:
-        if case.final_risk_level in risk_counts:
-            risk_counts[case.final_risk_level] += 1
-        if case.final_answer:
-            payload = json.loads(case.final_answer)
-            comp = payload.get("agent_outputs", {}).get("prescription_compliance", {})
-            for item in comp.get("findings", []):
-                compliance_issues[item] = compliance_issues.get(item, 0) + 1
-            if payload.get("agent_outputs", {}).get("availability"):
-                shortage_cases += 1
-            osr = payload.get("agent_outputs", {}).get("online_seller_risk", {})
-            if osr and osr.get("red_flags"):
-                supplier_risk_cases += 1
-    acceptance_rate = (
-        sum(1 for feedback in feedback_items if feedback.rating >= 4) / len(feedback_items)
-        if feedback_items
-        else 0.0
+@router.post("", response_model=CaseRecordResponse)
+async def create_case(request: CaseCreateRequest) -> CaseRecordResponse:
+    # Dummy user_id for MVP
+    new_case = Case(
+        user_id="mock_user_123",
+        role=request.role,
+        case_type=request.case_type,
+        title=request.title,
+        query=request.query
     )
-    return DashboardSummary(
-        total_cases=len(cases),
-        risk_counts=risk_counts,
-        compliance_issues=compliance_issues,
-        shortage_cases=shortage_cases,
-        supplier_risk_cases=supplier_risk_cases,
-        feedback_acceptance_rate=round(acceptance_rate, 2),
-    )
+    await new_case.insert()
+    return CaseRecordResponse.model_validate(new_case.model_dump())
 
-
-@router.get("", response_model=list[CaseListItem])
-def list_cases(db: Session = Depends(get_db)) -> list[CaseListItem]:
-    cases = db.query(PharmacyCase).order_by(PharmacyCase.created_at.desc()).all()
-    return [CaseListItem.model_validate(case.as_dict()) for case in cases]
-
+@router.get("", response_model=List[CaseRecordResponse])
+async def list_cases() -> List[CaseRecordResponse]:
+    cases = await Case.find_all().to_list()
+    return [CaseRecordResponse.model_validate(c.model_dump()) for c in cases]
 
 @router.get("/{case_id}", response_model=CaseRecordResponse)
-def get_case(case_id: str, db: Session = Depends(get_db)) -> CaseRecordResponse:
-    case = db.query(PharmacyCase).filter(PharmacyCase.id == case_id).first()
+async def get_case(case_id: str) -> CaseRecordResponse:
+    case = await Case.find_one(Case.case_id == case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
-    if not case.final_answer:
-        raise HTTPException(status_code=409, detail="Case analysis not completed")
-    payload = json.loads(case.final_answer)
-    payload["created_at"] = case.created_at
-    payload["updated_at"] = case.updated_at
-    return CaseRecordResponse.model_validate(payload)
+    return CaseRecordResponse.model_validate(case.model_dump())
+
+@router.post("/{case_id}/analyze", response_model=CaseAnalyzeResponse)
+async def analyze_case(case_id: str) -> CaseAnalyzeResponse:
+    target_case = await Case.find_one(Case.case_id == case_id)
+    if not target_case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    
+    # Fetch all parsed documents to build context
+    documents = await UserDocument.find(UserDocument.case_id == case_id).to_list()
+    context_text = " ".join([doc.text_content for doc in documents if doc.text_content])
+    # Append the user's query
+    context_text += f"\nQuery: {target_case.query}"
+    
+    result_data = {}
+    
+    if target_case.role == RoleEnum.PATIENT:
+        agent = PatientAgent()
+        result_data = await agent.analyze(target_case, context_text)
+    elif target_case.role == RoleEnum.PHARMACIST:
+        agent = PharmacistAgent()
+        result_data = await agent.analyze(target_case, context_text)
+    elif target_case.role == RoleEnum.DOCTOR:
+        agent = DoctorAgent()
+        result_data = await agent.analyze(target_case, context_text)
+    elif target_case.role == RoleEnum.ADMIN:
+        agent = AdminAgent()
+        result_data = await agent.analyze(target_case, context_text)
+    else:
+        raise HTTPException(status_code=400, detail="Unknown role workflow")
+        
+    # Create the AgentRun trace
+    run = AgentRun(
+        case_id=case_id,
+        agent_name=f"{target_case.role.value}_AGENT",
+        role=target_case.role.value,
+        input_json={"context": context_text},
+        output_json=result_data
+    )
+    await run.insert()
+    
+    # Update the final case
+    target_case.status = "COMPLETED"
+    target_case.final_summary = json.dumps(result_data)
+    await target_case.save()
+    
+    return CaseAnalyzeResponse(
+        case_id=case_id,
+        status="COMPLETED",
+        result=result_data
+    )
