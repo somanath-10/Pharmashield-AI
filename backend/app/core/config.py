@@ -15,12 +15,17 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
 
     # MongoDB
-    database_url: str = "mongodb+srv://somanathr2004:iwp1hBSZtsv27JBA@cluster0.wyntp.mongodb.net/pharmashield_india?retryWrites=true&w=majority"
+    database_url: str = ""
 
     # LLM (mock for MVP)
     llm_provider: str = "mock"
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
+
+    # Qdrant
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str = ""
+    qdrant_collection_name: str = "pharmashield_documents"
 
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
 
