@@ -25,14 +25,9 @@ class SynthesisAgent:
         citations = self._collect_citations(agent_outputs)
         action_plan = self._collect_actions(agent_outputs)
         summary = self._summary_text(request, agent_outputs, overall_risk, citations)
-        draft_prescriber_message = agent_outputs.get("coverage", {}).get(
-            "draft_prescriber_message",
-            "Please review the payer requirements and submit the missing pharmacist-reviewable documentation packet.",
-        )
-        draft_patient_message = agent_outputs.get("authenticity", {}).get(
-            "draft_patient_message",
-            "Please wait for pharmacist review before changing therapy, supplier, or product source.",
-        )
+        
+        draft_patient_message = "Please wait for pharmacist review before purchasing or switching medicines."
+        draft_prescriber_message = "Please review requested substitution, scheme compliance, or alternative availability."
 
         trace = []
         for key, output in agent_outputs.items():
@@ -40,7 +35,7 @@ class SynthesisAgent:
                 AgentTraceItem(
                     agent_name=output.get("agent_name", key),
                     status=output.get("status", "completed"),
-                    risk_level=output.get("risk_level", RiskLevel.LOW.value),
+                    risk_level=RiskLevel(output.get("risk_level", RiskLevel.LOW.value)),
                     findings=output.get("findings", []),
                     recommended_actions=output.get("recommended_actions", []),
                     citations=output.get("citations", []),
@@ -90,7 +85,7 @@ class SynthesisAgent:
         actions: list[str] = []
         for output in agent_outputs.values():
             actions.extend(output.get("recommended_actions", []))
-        actions.append(PHARMACIST_REVIEW_DISCLAIMER)
+        actions.append("Pharmacist review required before clinical, dispensing, substitution, or patient-specific action.")
         return list(dict.fromkeys(actions))
 
     @staticmethod
@@ -100,14 +95,5 @@ class SynthesisAgent:
         overall_risk: RiskLevel,
         citations: list[Citation],
     ) -> str:
-        sections = [f"Overall Risk Level: {overall_risk.value}."]
-        if "shortage" in agent_outputs:
-            sections.append("Shortage / Inventory Assessment: local inventory is unavailable or constrained and substitution should stay prescriber-reviewed.")
-        if "coverage" in agent_outputs:
-            sections.append("Coverage / Prior Authorization Assessment: payer documentation gaps or denial signals were identified and a draft prescriber request was prepared.")
-        if "authenticity" in agent_outputs:
-            sections.append("Authenticity / Compliance Assessment: the patient-provided product source has red flags and should not be recommended until verified through a licensed supply chain.")
-        citation_note = "Evidence and citations attached." if citations else "No supporting source found. Needs pharmacist review."
-        sections.append(citation_note)
-        sections.append(PHARMACIST_REVIEW_DISCLAIMER)
+        sections = [f"This case involves medicine availability, affordability, prescription compliance, and suspicious online seller risk. Overall Risk Level: {overall_risk.value}."]
         return " ".join(sections)

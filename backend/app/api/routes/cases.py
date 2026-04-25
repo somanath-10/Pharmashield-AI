@@ -30,7 +30,7 @@ def dashboard_summary(db: Session = Depends(get_db)) -> DashboardSummary:
     cases = db.query(PharmacyCase).all()
     feedback_items = db.query(Feedback).all()
     risk_counts = {"LOW": 0, "MEDIUM": 0, "HIGH": 0, "CRITICAL": 0}
-    pa_missing: dict[str, int] = {}
+    compliance_issues: dict[str, int] = {}
     shortage_cases = 0
     supplier_risk_cases = 0
     for case in cases:
@@ -38,13 +38,13 @@ def dashboard_summary(db: Session = Depends(get_db)) -> DashboardSummary:
             risk_counts[case.final_risk_level] += 1
         if case.final_answer:
             payload = json.loads(case.final_answer)
-            coverage = payload.get("agent_outputs", {}).get("coverage", {})
-            for item in coverage.get("missing_evidence", []):
-                pa_missing[item] = pa_missing.get(item, 0) + 1
-            if payload.get("agent_outputs", {}).get("shortage"):
+            comp = payload.get("agent_outputs", {}).get("prescription_compliance", {})
+            for item in comp.get("findings", []):
+                compliance_issues[item] = compliance_issues.get(item, 0) + 1
+            if payload.get("agent_outputs", {}).get("availability"):
                 shortage_cases += 1
-            authenticity = payload.get("agent_outputs", {}).get("authenticity", {})
-            if authenticity and authenticity.get("red_flags"):
+            osr = payload.get("agent_outputs", {}).get("online_seller_risk", {})
+            if osr and osr.get("red_flags"):
                 supplier_risk_cases += 1
     acceptance_rate = (
         sum(1 for feedback in feedback_items if feedback.rating >= 4) / len(feedback_items)
@@ -54,7 +54,7 @@ def dashboard_summary(db: Session = Depends(get_db)) -> DashboardSummary:
     return DashboardSummary(
         total_cases=len(cases),
         risk_counts=risk_counts,
-        pa_missing_evidence_counts=pa_missing,
+        compliance_issues=compliance_issues,
         shortage_cases=shortage_cases,
         supplier_risk_cases=supplier_risk_cases,
         feedback_acceptance_rate=round(acceptance_rate, 2),

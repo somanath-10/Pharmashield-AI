@@ -30,28 +30,37 @@ export interface AgentTraceItem {
 export interface CaseAnalyzeRequest {
   query: string;
   drug_name?: string | null;
-  payer_name?: string | null;
-  patient_context: {
-    age?: number | null;
-    diagnoses: string[];
-    labs: Record<string, string>;
-    previous_therapies: string[];
-    allergies: string[];
+  brand_name?: string | null;
+  location_state?: string | null;
+  prescription_context: {
+    prescription_available: boolean;
+    doctor_name?: string | null;
+    prescription_date?: string | null;
   };
   inventory_context: {
-    location_id?: string | null;
     quantity_on_hand?: number | null;
-    reorder_threshold?: number | null;
-    lot_number?: string | null;
+    same_molecule_available: boolean;
+    location_id?: string | null;
+  };
+  patient_context: {
+    condition?: string | null;
+    budget_sensitive: boolean;
+    scheme_context: {
+      pmjay_eligible?: boolean | null;
+      hospitalized?: boolean | null;
+      corporate_opd?: boolean | null;
+    };
   };
   product_context: {
-    supplier_name?: string | null;
+    seller_type?: string | null;
+    seller_name?: string | null;
     claim_text?: string | null;
-    ndc?: string | null;
-    lot_number?: string | null;
+    batch_number?: string | null;
     manufacturer?: string | null;
+    license_number?: string | null;
+    mrp?: number | null;
+    expiry_date?: string | null;
   };
-  denial_letter_text?: string | null;
 }
 
 export interface CaseAnalyzeResponse {
@@ -86,7 +95,7 @@ export interface CaseListItem {
 export interface DashboardSummary {
   total_cases: number;
   risk_counts: Record<string, number>;
-  pa_missing_evidence_counts: Record<string, number>;
+  compliance_issues: Record<string, number>;
   shortage_cases: number;
   supplier_risk_cases: number;
   feedback_acceptance_rate: number;

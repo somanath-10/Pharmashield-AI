@@ -9,37 +9,50 @@ from app.schemas.agent import Citation, Finding
 from app.schemas.risk import RiskLevel
 
 
-class PatientContext(BaseModel):
-    age: int | None = None
-    diagnoses: list[str] = Field(default_factory=list)
-    labs: dict[str, Any] = Field(default_factory=dict)
-    previous_therapies: list[str] = Field(default_factory=list)
-    allergies: list[str] = Field(default_factory=list)
+class PrescriptionContext(BaseModel):
+    prescription_available: bool = False
+    doctor_name: str | None = None
+    prescription_date: str | None = None
 
 
 class InventoryContext(BaseModel):
-    location_id: str | None = None
     quantity_on_hand: int | None = None
-    reorder_threshold: int | None = None
-    lot_number: str | None = None
+    same_molecule_available: bool = False
+    location_id: str | None = None
+
+
+class SchemeContext(BaseModel):
+    pmjay_eligible: bool | None = None
+    hospitalized: bool | None = None
+    corporate_opd: bool | None = None
+
+
+class PatientContext(BaseModel):
+    condition: str | None = None
+    budget_sensitive: bool = False
+    scheme_context: SchemeContext = Field(default_factory=SchemeContext)
 
 
 class ProductContext(BaseModel):
-    supplier_name: str | None = None
+    seller_type: str | None = None
+    seller_name: str | None = None
     claim_text: str | None = None
-    ndc: str | None = None
-    lot_number: str | None = None
+    batch_number: str | None = None
     manufacturer: str | None = None
+    license_number: str | None = None
+    mrp: float | None = None
+    expiry_date: str | None = None
 
 
 class CaseAnalyzeRequest(BaseModel):
     query: str
     drug_name: str | None = None
-    payer_name: str | None = None
-    patient_context: PatientContext = Field(default_factory=PatientContext)
+    brand_name: str | None = None
+    location_state: str | None = None
+    prescription_context: PrescriptionContext = Field(default_factory=PrescriptionContext)
     inventory_context: InventoryContext = Field(default_factory=InventoryContext)
+    patient_context: PatientContext = Field(default_factory=PatientContext)
     product_context: ProductContext = Field(default_factory=ProductContext)
-    denial_letter_text: str | None = None
 
 
 class AgentTraceItem(BaseModel):
@@ -62,9 +75,10 @@ class CaseAnalyzeResponse(BaseModel):
     agent_outputs: dict[str, dict[str, Any]] = Field(default_factory=dict)
     agent_trace: list[AgentTraceItem] = Field(default_factory=list)
     citations: list[Citation] = Field(default_factory=list)
-    draft_prescriber_message: str
-    draft_patient_message: str
+    draft_prescriber_message: str | None = None
+    draft_patient_message: str | None = None
     pharmacist_review_required: bool = True
+    mandatory_disclaimer: str = "Pharmacist review required before clinical, dispensing, substitution, or patient-specific action."
     memory_notes: list[dict[str, Any]] = Field(default_factory=list)
 
 
@@ -78,7 +92,8 @@ class CaseListItem(BaseModel):
     case_type: str
     status: str
     drug_name: str | None = None
-    payer_name: str | None = None
+    brand_name: str | None = None
+    location_state: str | None = None
     final_risk_level: str | None = None
     created_at: datetime
     updated_at: datetime
@@ -87,7 +102,7 @@ class CaseListItem(BaseModel):
 class DashboardSummary(BaseModel):
     total_cases: int
     risk_counts: dict[str, int]
-    pa_missing_evidence_counts: dict[str, int]
+    compliance_issues: dict[str, int]
     shortage_cases: int
     supplier_risk_cases: int
     feedback_acceptance_rate: float

@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, Integer, String, Text, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, utcnow
@@ -20,12 +20,14 @@ class Drug(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     brand_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     generic_name: Mapped[str] = mapped_column(String(255), index=True)
-    active_ingredient: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    composition: Mapped[str | None] = mapped_column(String(255), nullable=True)
     strength: Mapped[str | None] = mapped_column(String(100), nullable=True)
     dosage_form: Mapped[str | None] = mapped_column(String(100), nullable=True)
     route: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    ndc: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     manufacturer: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    schedule_category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    is_prescription_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_high_risk: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class InventoryItem(TimestampMixin, Base):
@@ -34,57 +36,111 @@ class InventoryItem(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     drug_id: Mapped[str | None] = mapped_column(ForeignKey("drugs.id"), nullable=True)
     location_id: Mapped[str] = mapped_column(String(255), index=True)
+    state: Mapped[str | None] = mapped_column(String(100), nullable=True)
     quantity_on_hand: Mapped[int] = mapped_column(Integer, default=0)
     reorder_threshold: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    lot_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    batch_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
     expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     supplier_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    supplier_license_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    purchase_invoice_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     drug: Mapped[Drug | None] = relationship()
 
 
-class ShortageEvent(TimestampMixin, Base):
-    __tablename__ = "shortage_events"
+class PriceRecord(TimestampMixin, Base):
+    __tablename__ = "price_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    drug_id: Mapped[str | None] = mapped_column(ForeignKey("drugs.id"), nullable=True)
+    brand_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    generic_name: Mapped[str] = mapped_column(String(255), index=True)
+    composition: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    strength: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    dosage_form: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    mrp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ceiling_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    source: Mapped[str] = mapped_column(String(255))
+    source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class JanAushadhiProduct(TimestampMixin, Base):
+    __tablename__ = "janaushadhi_products"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    generic_name: Mapped[str] = mapped_column(String(255), index=True)
+    composition: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    strength: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    dosage_form: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    pack_size: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    janaushadhi_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    availability_status: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    source: Mapped[str] = mapped_column(String(255))
+    source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DrugScheduleRule(TimestampMixin, Base):
+    __tablename__ = "drug_schedule_rules"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    schedule_category: Mapped[str] = mapped_column(String(100), index=True)
+    drug_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    composition: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    rule_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    requires_prescription: Mapped[bool] = mapped_column(Boolean, default=False)
+    requires_sales_register: Mapped[bool] = mapped_column(Boolean, default=False)
+    requires_special_storage: Mapped[bool] = mapped_column(Boolean, default=False)
+    source: Mapped[str] = mapped_column(String(255))
+    source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class NSQAlert(TimestampMixin, Base):
+    __tablename__ = "nsq_alerts"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     drug_name: Mapped[str] = mapped_column(String(255), index=True)
-    generic_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
-    status: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    therapeutic_category: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    brand_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    composition: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    manufacturer: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    batch_number: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    test_lab: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    reporting_source: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    month: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    alert_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     source: Mapped[str] = mapped_column(String(255))
     source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    initial_posting_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    last_updated: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     raw_payload_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
 
-class RecallEvent(TimestampMixin, Base):
-    __tablename__ = "recall_events"
+class Supplier(TimestampMixin, Base):
+    __tablename__ = "suppliers"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    drug_name: Mapped[str] = mapped_column(String(255), index=True)
-    classification: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    reason_for_recall: Mapped[str | None] = mapped_column(Text, nullable=True)
-    recalling_firm: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    distribution_pattern: Mapped[str | None] = mapped_column(Text, nullable=True)
-    product_description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    code_info: Mapped[str | None] = mapped_column(Text, nullable=True)
-    source: Mapped[str] = mapped_column(String(255))
-    source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    raw_payload_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    supplier_name: Mapped[str] = mapped_column(String(255), index=True)
+    seller_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    license_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    state: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    verification_status: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    risk_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    risk_reasons_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
 
-class PayerPolicy(TimestampMixin, Base):
-    __tablename__ = "payer_policies"
+class SchemeRule(TimestampMixin, Base):
+    __tablename__ = "scheme_rules"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    payer_name: Mapped[str] = mapped_column(String(255), index=True)
-    therapy_area: Mapped[str] = mapped_column(String(255))
-    drug_name: Mapped[str] = mapped_column(String(255), index=True)
-    policy_title: Mapped[str] = mapped_column(String(255))
-    criteria_text: Mapped[str] = mapped_column(Text)
-    effective_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    scheme_name: Mapped[str] = mapped_column(String(255), index=True)
+    scheme_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    eligibility_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    coverage_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    required_documents_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    applies_to_retail_pharmacy: Mapped[bool] = mapped_column(Boolean, default=False)
+    applies_to_hospitalization: Mapped[bool] = mapped_column(Boolean, default=False)
     source: Mapped[str] = mapped_column(String(255))
     source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
@@ -97,10 +153,12 @@ class PharmacyCase(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(100), default="pending")
     patient_hash: Mapped[str] = mapped_column(String(64), index=True)
     drug_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    payer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    brand_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    location_state: Mapped[str | None] = mapped_column(String(100), nullable=True)
     case_input_json: Mapped[dict[str, Any]] = mapped_column(JSON)
     final_risk_level: Mapped[str | None] = mapped_column(String(50), nullable=True)
     final_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pharmacist_review_required: Mapped[bool] = mapped_column(Boolean, default=True)
 
     agent_runs: Mapped[list[AgentRun]] = relationship(back_populates="case")
     feedback_items: Mapped[list[Feedback]] = relationship(back_populates="case")

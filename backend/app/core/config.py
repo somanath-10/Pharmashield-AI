@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     enable_live_public_apis: bool = True
     enable_synthetic_data: bool = True
+    enable_india_mode: bool = True
     max_retrieved_chunks: int = 20
     max_reranked_chunks: int = 8
     upload_dir: str = "storage/uploads"
