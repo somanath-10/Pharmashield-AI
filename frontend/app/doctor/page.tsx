@@ -38,7 +38,7 @@ export default function DoctorDashboard() {
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Review summarized patient case highlights and clinical follow-up points.</p>
         </div>
-        <Link href="/" style={{ textDecoration: 'none' }}>
+        <Link href="/login" style={{ textDecoration: 'none' }}>
           <button className="btn-primary btn-sm" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}>← Change Role</button>
         </Link>
       </div>

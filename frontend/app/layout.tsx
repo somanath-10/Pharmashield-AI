@@ -36,9 +36,24 @@ export default function RootLayout({
               PharmaShield India AI
             </span>
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-            Role-Based Healthcare Assistant
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+              Role-Based Healthcare Assistant
+            </span>
+            <a href="/login" style={{ 
+              textDecoration: 'none',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              color: 'var(--text-primary)',
+              background: 'rgba(255,255,255,0.06)',
+              padding: '6px 14px',
+              borderRadius: '8px',
+              border: '1px solid rgba(255,255,255,0.1)',
+              transition: 'all 0.2s'
+            }}>
+              Log Out
+            </a>
+          </div>
         </nav>
 
         <main style={{ maxWidth: '1080px', margin: '0 auto', padding: '40px 24px' }}>

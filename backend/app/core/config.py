@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
 
     # MongoDB
-    database_url: str = "mongodb://localhost:27017/pharmashield_india"
+    database_url: str = "mongodb+srv://somanathr2004:iwp1hBSZtsv27JBA@cluster0.wyntp.mongodb.net/pharmashield_india?retryWrites=true&w=majority"
 
     # LLM (mock for MVP)
     llm_provider: str = "mock"

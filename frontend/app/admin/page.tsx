@@ -45,7 +45,7 @@ export default function AdminDashboard() {
           <button onClick={fetchMetrics} className="btn-primary btn-sm" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}>
             🔄 Refresh
           </button>
-          <Link href="/" style={{ textDecoration: 'none' }}>
+          <Link href="/login" style={{ textDecoration: 'none' }}>
             <button className="btn-primary btn-sm" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}>← Change Role</button>
           </Link>
         </div>
