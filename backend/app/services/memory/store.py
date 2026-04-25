@@ -38,15 +38,15 @@ class MemoryStore:
         scope = "GLOBAL"
         memory_type = "pharmacist_correction"
         value_json = {"correction_text": feedback.correction_text}
-        if feedback.agent_name == "coverage_agent" and case.payer_name:
-            scope = "PAYER"
-            key = f"{case.payer_name}::{case.drug_name or 'unknown'}"
-            memory_type = "payer_requirement"
+        if feedback.agent_name == "nsq_spurious_agent" and case.brand_name:
+            scope = "DRUG"
+            key = case.brand_name
+            memory_type = "nsq_alert_note"
             value_json = {
-                "common_missing_docs": self._extract_document_hints(feedback.correction_text),
                 "correction_text": feedback.correction_text,
+                "manual_override": True
             }
-        elif feedback.agent_name == "authenticity_agent":
+        elif feedback.agent_name == "online_seller_risk_agent":
             scope = "SUPPLIER"
             key = case.case_input_json.get("product_context", {}).get("supplier_name") or "unknown_supplier"
             memory_type = "supplier_risk_note"

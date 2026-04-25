@@ -9,9 +9,9 @@ class PriceJanAushadhiAgent(BaseAgent):
             "risk_level": "MEDIUM",
             "affordability_issue": True,
             "findings": [
-                "Patient is budget-sensitive.",
-                "Check NPPA/Pharma Sahi Daam price reference.",
-                "Check Jan Aushadhi or generic equivalent if clinically appropriate."
+                {"title": "Budget Sensitivity", "detail": "Patient is marked as budget-sensitive."},
+                {"title": "Pricing Check", "detail": "NPPA/Pharma Sahi Daam price reference should be verified."},
+                {"title": "Jan Aushadhi Opportunity", "detail": "Cost-effective PMBJP equivalents may be available."}
             ],
             "recommended_actions": [
                 "Verify MRP before sale.",

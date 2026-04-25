@@ -7,11 +7,9 @@ class OnlineSellerRiskAgent(BaseAgent):
         return {
             "agent_name": "online_seller_risk_agent",
             "risk_level": "HIGH",
-            "red_flags": [
-                "Claim says no prescription needed.",
-                "No license number provided.",
-                "No batch number provided.",
-                "No manufacturer provided."
+            "findings": [
+                {"title": "Unverified Source", "detail": "Online sellers without a valid physical address or license are considered high-risk."},
+                {"title": "Missing Prescription", "detail": "Any claim of 'no prescription needed' for Schedule H/X drugs is a legal red flag."}
             ],
             "recommended_actions": [
                 "Do not recommend unverified online seller.",

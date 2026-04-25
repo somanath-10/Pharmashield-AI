@@ -130,6 +130,18 @@ class Supplier(TimestampMixin, Base):
     risk_reasons_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
 
+class RedFlagSeller(TimestampMixin, Base):
+    __tablename__ = "red_flag_sellers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    seller_identifier: Mapped[str] = mapped_column(String(255), index=True) # Domain, WhatsApp Number, or Handle
+    identifier_type: Mapped[str] = mapped_column(String(50)) # 'domain', 'whatsapp', 'social_media', 'upi_id'
+    risk_category: Mapped[str] = mapped_column(String(100)) # 'spurious_medicines', 'no_prescription_sale', 'fraud'
+    evidence_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reported_count: Mapped[int] = mapped_column(Integer, default=1)
+    is_blacklisted: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
 class SchemeRule(TimestampMixin, Base):
     __tablename__ = "scheme_rules"
 
@@ -143,6 +155,44 @@ class SchemeRule(TimestampMixin, Base):
     applies_to_hospitalization: Mapped[bool] = mapped_column(Boolean, default=False)
     source: Mapped[str] = mapped_column(String(255))
     source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class PatientProfile(TimestampMixin, Base):
+    __tablename__ = "patient_profiles"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    abha_id: Mapped[str | None] = mapped_column(String(100), index=True, nullable=True)
+    full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    age: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    gender: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    chronic_diagnoses: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    allergies: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    preferred_language: Mapped[str | None] = mapped_column(String(50), nullable=True, default="Hindi")
+    scheme_membership_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+
+class RegulatoryGuideline(TimestampMixin, Base):
+    __tablename__ = "regulatory_guidelines"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    issuing_authority: Mapped[str] = mapped_column(String(255), index=True) # CDSCO, NPPA, State FDA
+    circular_number: Mapped[str | None] = mapped_column(String(100), index=True)
+    title: Mapped[str] = mapped_column(String(500))
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    full_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    effective_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class Pharmacist(TimestampMixin, Base):
+    __tablename__ = "pharmacists"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    full_name: Mapped[str] = mapped_column(String(255))
+    pci_registration_number: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    state_council: Mapped[str] = mapped_column(String(255))
+    qualification: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class PharmacyCase(TimestampMixin, Base):
@@ -159,6 +209,7 @@ class PharmacyCase(TimestampMixin, Base):
     final_risk_level: Mapped[str | None] = mapped_column(String(50), nullable=True)
     final_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
     pharmacist_review_required: Mapped[bool] = mapped_column(Boolean, default=True)
+    reviewed_by_pharmacist_id: Mapped[str | None] = mapped_column(ForeignKey("pharmacists.id"), nullable=True)
 
     agent_runs: Mapped[list[AgentRun]] = relationship(back_populates="case")
     feedback_items: Mapped[list[Feedback]] = relationship(back_populates="case")

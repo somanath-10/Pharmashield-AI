@@ -8,7 +8,7 @@ class AvailabilityAgent(BaseAgent):
             "agent_name": "availability_agent",
             "risk_level": "MEDIUM",
             "findings": [
-                "Current stock is zero for the requested medicine."
+                {"title": "Stock Shortage", "detail": "Current stock is zero for the requested medicine at this location."}
             ],
             "recommended_actions": [
                 "Check same composition, same strength, same dosage form alternatives.",

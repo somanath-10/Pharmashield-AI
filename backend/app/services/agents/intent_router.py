@@ -27,14 +27,14 @@ class IntentRouter:
         if any(term in query for term in ["jan aushadhi", "pmbjp", "government generic"]):
             intents.add("JAN_AUSHADHI")
 
-        if any(term in query for term in ["without prescription", "prescription not available", "schedule h", "schedule h1", "schedule x"]):
+        if any(term in query for term in ["without prescription", "prescription not available", "schedule h", "schedule h1", "schedule x", "dispensing", "rules"]):
             intents.add("PRESCRIPTION_COMPLIANCE")
             intents.add("SCHEDULED_DRUG")
 
         if any(term in query for term in ["fake", "counterfeit", "spurious", "nsq", "quality fail", "batch", "expiry"]):
             intents.add("NSQ_SPURIOUS")
 
-        if any(term in query for term in ["online seller", "whatsapp seller", "instagram seller", "no prescription online", "cheap online"]):
+        if any(term in query for term in ["online seller", "whatsapp", "instagram", "no prescription online", "cheap online", "buy online"]):
             intents.add("ONLINE_SELLER_RISK")
 
         if any(term in query for term in ["pm-jay", "ayushman", "cghs", "esic", "corporate opd", "reimbursement", "claim", "hospital cashless"]):

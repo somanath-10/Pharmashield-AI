@@ -8,8 +8,8 @@ class SchemeClaimAgent(BaseAgent):
             "agent_name": "scheme_claim_agent",
             "risk_level": "LOW",
             "findings": [
-                "This appears to be a normal retail pharmacy purchase.",
-                "Retail counter insurance approval may not apply unless linked to a specific scheme or corporate OPD benefit."
+                {"title": "Retail Limitation", "detail": "Most government schemes like PM-JAY cover medications primarily during hospitalization, not at retail counters."},
+                {"title": "Verification Needed", "detail": "Corporate OPD or specialized reimbursement schemes (CGHS/ESIC) require additional documentation for retail claims."}
             ],
             "required_documents": [
                 "Doctor prescription",

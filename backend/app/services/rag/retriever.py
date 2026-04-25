@@ -27,7 +27,6 @@ class HybridRetriever:
         *,
         query: str,
         drug_name: str | None = None,
-        payer_name: str | None = None,
         metadata_filters: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         expanded_queries = self.query_expander.expand(query, drug_name=drug_name)
@@ -52,7 +51,6 @@ class HybridRetriever:
             list(merged.values()),
             query=query,
             drug_name=drug_name,
-            payer_name=payer_name,
             limit=self.settings.max_reranked_chunks,
         )
         return reranked
