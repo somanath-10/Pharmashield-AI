@@ -1,37 +1,42 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import Optional
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from typing import Optional, Any, Dict
 
 from app.models.domain import UserDocument, DocumentTypeEnum, Case
-from app.schemas.case import DocumentUploadResponse
+from app.services.documents.validator import validate_document_upload
+from app.services.documents.parser import extract_text_from_file
+from app.services.rag.ingestion import ingest_document
 
 router = APIRouter(prefix="/api/cases", tags=["documents"])
 
-class MockUploadRequest(BaseModel):
-    document_type: DocumentTypeEnum
-    file_name: str
-    mock_extracted_text: str
-
-@router.post("/{case_id}/documents", response_model=DocumentUploadResponse)
-async def upload_mock_document(case_id: str, request: MockUploadRequest) -> DocumentUploadResponse:
+@router.post("/{case_id}/documents")
+async def upload_real_document(
+    case_id: str, 
+    file: UploadFile = File(...),
+) -> Dict[str, Any]:
     # 1. Verify case
     target_case = await Case.find_one(Case.case_id == case_id)
     if not target_case:
         raise HTTPException(status_code=404, detail="Case not found")
         
-    # 2. Save document record
+    # 2. Validate file
+    validate_document_upload(file)
+    
+    # 3. Extract text
+    try:
+        text = await extract_text_from_file(file)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse document: {str(e)}")
+        
+    # 4. Save initial document record
     doc = UserDocument(
         case_id=case_id,
         user_id=target_case.user_id,
-        document_type=request.document_type,
-        file_name=request.file_name,
-        text_content=request.mock_extracted_text
+        document_type=DocumentTypeEnum.OTHER, # will be updated by classifier
+        file_name=file.filename,
+        mime_type=file.content_type,
     )
     await doc.insert()
     
-    return DocumentUploadResponse(
-        document_id=doc.document_id,
-        file_name=doc.file_name,
-        status="MOCK_UPLOADED",
-        extracted_text_preview=doc.text_content[:100] + "..." if doc.text_content else None
-    )
+    # 5. RAG Ingestion pipeline
+    result = await ingest_document(doc, text)
+    return result

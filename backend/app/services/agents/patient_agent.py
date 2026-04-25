@@ -1,63 +1,54 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 from app.models.domain import Case
 
 class PatientAgent:
     """
-    Patient Agent explains prescriptions and lab reports in simple language.
-    It strictly adheres to safety disclaimers and avoids diagnosing.
+    Patient Agent explains prescriptions and lab reports in simple language using RAG.
     """
     
-    async def analyze(self, case: Case, context_text: str) -> Dict[str, Any]:
-        # MVP Mock Extraction Logic
+    async def analyze(self, case: Case, retrieved_chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
         medicines = []
         lab_values = []
         
-        text_lower = context_text.lower()
-        if "metformin" in text_lower:
-            medicines.append({
-                "name": "Metformin",
-                "purpose": "Commonly used for blood sugar control.",
-                "instruction": "Take it only as written by your doctor. Do not change the dose yourself."
-            })
-        if "amoxicillin" in text_lower or "augmentin" in text_lower:
-            medicines.append({
-                "name": "Amoxicillin / Augmentin",
-                "purpose": "Antibiotic used to treat bacterial infections.",
-                "instruction": "Complete the full course even if you feel better."
-            })
+        # Simple mock RAG processing
+        for chunk in retrieved_chunks:
+            payload = chunk.get("payload", {})
+            chunk_type = payload.get("chunk_type")
+            text = payload.get("chunk_text", "").lower()
             
-        if "hba1c" in text_lower or "8.2" in text_lower:
-            lab_values.append({
-                "test": "HbA1c",
-                "value": "8.2%",
-                "explanation": "This is a blood sugar control marker. Your doctor should review whether your current treatment plan needs adjustment."
-            })
-
+            if chunk_type == "medicine" or "metformin" in text or "amoxicillin" in text:
+                medicines.append(payload.get("medicine_name", "Prescribed Medicine"))
+            if chunk_type == "lab_value" or "hba1c" in text:
+                lab_values.append(payload.get("test_name", "Lab Test"))
+                
         has_meds = len(medicines) > 0
         has_labs = len(lab_values) > 0
         
-        summary = "Your uploaded documents mention "
+        simple_summary = "Based on your uploaded documents, we found "
         if has_meds and has_labs:
-            summary += "diabetes-related treatment and a blood sugar marker called HbA1c."
+            simple_summary += "information about medicines and lab test results."
         elif has_meds:
-            summary += "prescribed medicines."
+            simple_summary += "information about your medicines."
         elif has_labs:
-            summary += "lab test results."
+            simple_summary += "information about your lab tests."
         else:
-            summary += "general health information."
-
+            simple_summary += "general health information."
+            
         return {
-            "summary": summary,
-            "medicines_found": medicines,
-            "lab_values_found": lab_values,
+            "simple_summary": simple_summary,
+            "medicines_found": list(set(medicines)),
+            "lab_values_found": list(set(lab_values)),
+            "what_this_may_mean": "The documents indicate your current treatment or health status as prescribed by your doctor.",
             "warning_signs": [
-                "Seek medical help if you have severe weakness, confusion, fainting, breathing difficulty, or very high/low sugar symptoms."
+                "Seek medical help if you experience severe side effects or unexpected symptoms."
             ],
             "questions_to_ask_doctor": [
-                "What should be my target levels?",
-                "Should I change diet or exercise plan?",
-                "How long should I continue this medicine?",
-                "When should I repeat the test?"
+                "Are my current readings normal?",
+                "Do I need to change my medicine dosage?"
+            ],
+            "safe_next_steps": [
+                "Continue following your doctor's advice.",
+                "Do not stop or change any medicines without consulting your doctor."
             ],
             "disclaimer": "This explanation is for understanding only. It is not a diagnosis or prescription. Please consult your doctor or pharmacist before making any medical decision."
         }

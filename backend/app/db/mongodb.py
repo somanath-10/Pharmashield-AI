@@ -7,10 +7,12 @@ from app.models.domain import (
     User,
     Case,
     UserDocument,
+    DocumentChunk,
     ExtractedMedicine,
     ExtractedLabValue,
     AgentRun,
     Feedback,
+    Citation,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,10 +34,12 @@ async def init_db() -> None:
             User,
             Case,
             UserDocument,
+            DocumentChunk,
             ExtractedMedicine,
             ExtractedLabValue,
             AgentRun,
             Feedback,
+            Citation,
         ],
     )
     logger.info("MongoDB and Beanie ODM initialized successfully.")

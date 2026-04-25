@@ -1,5 +1,5 @@
 import json
-from typing import List
+from typing import List, Dict, Any
 from fastapi import APIRouter, HTTPException
 
 from app.models.domain import Case, RoleEnum, UserDocument, AgentRun
@@ -41,41 +41,60 @@ async def get_case(case_id: str) -> CaseRecordResponse:
         raise HTTPException(status_code=404, detail="Case not found")
     return CaseRecordResponse.model_validate(case.model_dump())
 
-@router.post("/{case_id}/analyze", response_model=CaseAnalyzeResponse)
-async def analyze_case(case_id: str) -> CaseAnalyzeResponse:
+from app.services.rag.retriever import hybrid_retrieve
+from app.services.rag.citation_verifier import build_citations
+from app.services.guardrails.output_validator import validate_role_output
+from pydantic import BaseModel
+
+class SearchRequest(BaseModel):
+    query: str
+    role: str
+
+@router.post("/{case_id}/search")
+async def search_documents(case_id: str, request: SearchRequest):
+    target_case = await Case.find_one(Case.case_id == case_id)
+    if not target_case:
+        raise HTTPException(status_code=404, detail="Case not found")
+        
+    chunks = await hybrid_retrieve(request.query, case_id, request.role)
+    citations = build_citations(chunks)
+    return {"results": citations}
+
+@router.post("/{case_id}/analyze")
+async def analyze_case(case_id: str) -> Dict[str, Any]: # Changed return type for dynamic dict
     target_case = await Case.find_one(Case.case_id == case_id)
     if not target_case:
         raise HTTPException(status_code=404, detail="Case not found")
     
-    # Fetch all parsed documents to build context
-    documents = await UserDocument.find(UserDocument.case_id == case_id).to_list()
-    context_text = " ".join([doc.text_content for doc in documents if doc.text_content])
-    # Append the user's query
-    context_text += f"\nQuery: {target_case.query}"
+    # 1. Retrieve RAG chunks based on case query
+    retrieved_chunks = await hybrid_retrieve(target_case.query, case_id, target_case.role.value)
+    
+    # 2. Build citations
+    citations = build_citations(retrieved_chunks)
     
     result_data = {}
     
     if target_case.role == RoleEnum.PATIENT:
         agent = PatientAgent()
-        result_data = await agent.analyze(target_case, context_text)
+        result_data = await agent.analyze(target_case, retrieved_chunks)
     elif target_case.role == RoleEnum.PHARMACIST:
         agent = PharmacistAgent()
-        result_data = await agent.analyze(target_case, context_text)
+        result_data = await agent.analyze(target_case, retrieved_chunks)
     elif target_case.role == RoleEnum.DOCTOR:
         agent = DoctorAgent()
-        result_data = await agent.analyze(target_case, context_text)
-    elif target_case.role == RoleEnum.ADMIN:
-        agent = AdminAgent()
-        result_data = await agent.analyze(target_case, context_text)
+        result_data = await agent.analyze(target_case, retrieved_chunks)
     else:
         raise HTTPException(status_code=400, detail="Unknown role workflow")
         
+    # 3. Apply Guardrails
+    result_data = validate_role_output(target_case.role.value, result_data)
+    
     # Create the AgentRun trace
     run = AgentRun(
         case_id=case_id,
         agent_name=f"{target_case.role.value}_AGENT",
         role=target_case.role.value,
-        input_json={"context": context_text},
+        input_json={"query": target_case.query},
         output_json=result_data
     )
     await run.insert()
@@ -85,8 +104,10 @@ async def analyze_case(case_id: str) -> CaseAnalyzeResponse:
     target_case.final_summary = json.dumps(result_data)
     await target_case.save()
     
-    return CaseAnalyzeResponse(
-        case_id=case_id,
-        status="COMPLETED",
-        result=result_data
-    )
+    return {
+        "case_id": case_id,
+        "role": target_case.role.value,
+        "status": "COMPLETED",
+        "answer": result_data,
+        "citations": citations
+    }

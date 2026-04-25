@@ -1,32 +1,48 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 from app.models.domain import Case
 
 class DoctorAgent:
     """
     Doctor Agent extracts a clinical summary of medicines, labs, 
-    and patient questions for the physician.
+    and patient questions for the physician using RAG.
     """
     
-    async def analyze(self, case: Case, context_text: str) -> Dict[str, Any]:
-        text_lower = context_text.lower()
+    async def analyze(self, case: Case, retrieved_chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
+        medicines = []
+        labs = []
+        documents_reviewed = []
         
-        has_metformin = "metformin" in text_lower
-        has_hba1c = "hba1c" in text_lower or "8.2" in text_lower
-        
-        summary = "Patient Summary:\n"
-        if has_metformin:
-            summary += "- Uploaded prescription includes anti-diabetic medication.\n"
-        if has_hba1c:
-            summary += "- Lab report shows elevated blood glucose marker (HbA1c ~8.2).\n"
-        summary += "- Patient asked about medicine timing and side effects."
+        for chunk in retrieved_chunks:
+            payload = chunk.get("payload", {})
+            chunk_type = payload.get("chunk_type")
+            text = payload.get("chunk_text", "").lower()
+            doc_name = payload.get("document_name", "Uploaded Document")
+            
+            documents_reviewed.append(doc_name)
+            
+            if chunk_type == "medicine" or "metformin" in text:
+                medicines.append(payload.get("medicine_name", "Metformin 500mg"))
+            if chunk_type == "lab_value" or "hba1c" in text:
+                labs.append("Elevated blood glucose marker (HbA1c ~8.2)")
+                
+        medicines = list(set(medicines))
+        labs = list(set(labs))
+        documents_reviewed = list(set(documents_reviewed))
         
         return {
-            "clinical_summary": summary,
-            "follow_up_points": [
+            "case_summary": "Patient has uploaded documents requiring clinical review.",
+            "documents_reviewed": documents_reviewed,
+            "medicines_identified": medicines,
+            "lab_highlights": labs,
+            "patient_questions": [
+                "Are my current readings normal?",
+                "Do I need to change my medicine dosage?"
+            ],
+            "follow_up_considerations": [
                 "Confirm current medication adherence.",
                 "Review lab trend.",
                 "Clarify duration of therapy.",
                 "Counsel patient on warning symptoms."
             ],
-            "disclaimer": "This is a support summary, not an automated diagnosis."
+            "professional_review_note": "This is an AI-generated support summary and does not replace clinical judgment."
         }

@@ -73,12 +73,31 @@ class UserDocument(Document):
     document_type: DocumentTypeEnum
     file_name: str
     file_url: Optional[str] = None
+    file_path: Optional[str] = None
+    mime_type: Optional[str] = None
     text_content: Optional[str] = None
     metadata_json: dict = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Settings:
         name = "documents"
+
+class DocumentChunk(Document):
+    chunk_id: Indexed(str) = Field(default_factory=uuid_str)
+    document_id: Indexed(str)
+    case_id: Indexed(str)
+    chunk_text: str
+    chunk_type: str
+    page_number: Optional[int] = None
+    section_title: Optional[str] = None
+    metadata_json: dict = Field(default_factory=dict)
+    qdrant_point_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    class Settings:
+        name = "document_chunks"
 
 class ExtractedMedicine(Document):
     medicine_id: Indexed(str) = Field(default_factory=uuid_str)
@@ -138,3 +157,19 @@ class Feedback(Document):
 
     class Settings:
         name = "feedback"
+
+class Citation(Document):
+    citation_id: Indexed(str) = Field(default_factory=uuid_str)
+    case_id: Indexed(str)
+    agent_run_id: Optional[str] = None
+    chunk_id: Indexed(str)
+    document_id: Indexed(str)
+    claim_text: Optional[str] = None
+    source_snippet: str
+    page_number: Optional[int] = None
+    document_name: Optional[str] = None
+    section_title: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    class Settings:
+        name = "citations"
