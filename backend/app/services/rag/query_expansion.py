@@ -1,19 +1,36 @@
 def expand_query(query: str, role: str) -> str:
-    # Simple rule-based expansion
+    """Expand query with India-specific pharmacy intelligence terms."""
     expanded = query
-    query_lower = query.lower()
-    
-    if "sugar" in query_lower or "diabetes" in query_lower:
-        expanded += " HbA1c blood glucose fasting postprandial"
-        
-    if "substitute" in query_lower or "replace" in query_lower:
-        expanded += " substitution composition strength same"
-        
+    q = query.lower()
+
+    # General clinical terms
+    if "sugar" in q or "diabetes" in q:
+        expanded += " HbA1c blood glucose fasting postprandial metformin"
+    if "substitute" in q or "replace" in q or "alternative" in q:
+        expanded += " substitution composition strength same generic"
+    if "cheap" in q or "affordable" in q or "budget" in q or "generic" in q:
+        expanded += " Jan Aushadhi NPPA price ceiling MRP generic composition"
+    if "augmentin" in q or "amoxicillin" in q:
+        expanded += " Amoxicillin Clavulanic Acid Schedule H1 antibiotic"
+    if "batch" in q or "nsq" in q or "spurious" in q:
+        expanded += " CDSCO NSQ batch manufacturer expiry quality alert"
+    if "whatsapp" in q or "online" in q or "instagram" in q:
+        expanded += " online seller license risk suspicious no prescription"
+    if "ayushman" in q or "pm-jay" in q or "pmjay" in q:
+        expanded += " PM-JAY hospitalization empanelled hospital cashless scheme"
+    if "cghs" in q:
+        expanded += " CGHS Central Government Health Scheme reimbursement"
+    if "prescription" in q or "schedule" in q:
+        expanded += " Schedule H H1 X prescription dispensing compliance"
+
+    # Role-specific additions
     if role == "PATIENT":
-        expanded += " explanation simple summary"
+        expanded += " simple explanation summary medicine lab report"
     elif role == "PHARMACIST":
-        expanded += " prescription dispensing counseling missing information"
+        expanded += " dispensing compliance counseling substitution stock"
     elif role == "DOCTOR":
         expanded += " clinical summary diagnosis highlights follow-up"
-        
+    elif role == "ADMIN":
+        expanded += " analytics risk overview high risk cases"
+
     return expanded

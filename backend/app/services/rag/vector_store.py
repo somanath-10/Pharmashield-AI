@@ -1,54 +1,77 @@
+import logging
 import uuid
-from qdrant_client import QdrantClient
-from qdrant_client.http.models import VectorParams, Distance, PointStruct
 from typing import List, Dict, Any
+
+from qdrant_client import QdrantClient
+from qdrant_client.http.models import VectorParams, Distance, PointStruct, Filter, FieldCondition, MatchValue
+
 from app.core.config import get_settings
+
+logger = logging.getLogger(__name__)
+
 
 class QdrantVectorStore:
     def __init__(self):
         settings = get_settings()
-        if settings.qdrant_url == ":memory:":
-            self.client = QdrantClient(location=":memory:")
-        else:
-            self.client = QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key or None)
+        self._available = False
         self.collection_name = settings.qdrant_collection_name
-        
-        # Ensure collection exists
         try:
+            if settings.qdrant_url == ":memory:":
+                self.client = QdrantClient(location=":memory:")
+            else:
+                self.client = QdrantClient(
+                    url=settings.qdrant_url,
+                    api_key=settings.qdrant_api_key or None,
+                )
+            # Ensure collection exists
             collections = self.client.get_collections().collections
             collection_names = [c.name for c in collections]
             if self.collection_name not in collection_names:
                 self.client.create_collection(
                     collection_name=self.collection_name,
-                    vectors_config=VectorParams(size=384, distance=Distance.COSINE)
+                    vectors_config=VectorParams(size=384, distance=Distance.COSINE),
                 )
+            self._available = True
         except Exception as e:
-            print(f"Failed to connect to Qdrant or create collection: {e}")
+            logger.warning(f"Qdrant unavailable — vector search disabled: {e}")
 
-    def insert_chunks(self, points: List[PointStruct]):
+    def insert_chunks(self, points: List[PointStruct]) -> None:
+        if not self._available:
+            return
         try:
-            self.client.upsert(
-                collection_name=self.collection_name,
-                points=points
-            )
+            self.client.upsert(collection_name=self.collection_name, points=points)
         except Exception as e:
-            print(f"Failed to upsert to Qdrant: {e}")
+            logger.warning(f"Failed to upsert to Qdrant: {e}")
 
     def search(self, query_vector: List[float], case_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+        """Search Qdrant with case_id filter. Gracefully returns [] if unavailable."""
+        if not self._available:
+            return []
         try:
-            results = self.client.search(
-                collection_name=self.collection_name,
-                query_vector=query_vector,
-                query_filter={
-                    "must": [
-                        {"key": "case_id", "match": {"value": case_id}}
-                    ]
-                },
-                limit=limit
+            # qdrant-client ≥1.7 uses query_points; handle both APIs
+            flt = Filter(
+                must=[FieldCondition(key="case_id", match=MatchValue(value=case_id))]
             )
+            try:
+                # New API (qdrant-client ≥ 1.7.3)
+                results = self.client.query_points(
+                    collection_name=self.collection_name,
+                    query=query_vector,
+                    query_filter=flt,
+                    limit=limit,
+                ).points
+            except AttributeError:
+                # Fallback for older qdrant-client
+                results = self.client.search(
+                    collection_name=self.collection_name,
+                    query_vector=query_vector,
+                    query_filter=flt,
+                    limit=limit,
+                )
             return [{"payload": r.payload, "score": r.score} for r in results]
         except Exception as e:
-            print(f"Failed to search Qdrant: {e}")
+            logger.warning(f"Qdrant search failed: {e}")
             return []
-            
+
+
 vector_store = QdrantVectorStore()

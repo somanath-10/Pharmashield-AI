@@ -14,6 +14,7 @@ from app.models.domain import (
     Feedback,
     Citation,
 )
+from app.services.memory.memory_store import MemoryEntry
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ async def init_db() -> None:
             AgentRun,
             Feedback,
             Citation,
+            MemoryEntry,
         ],
     )
     logger.info("MongoDB and Beanie ODM initialized successfully.")

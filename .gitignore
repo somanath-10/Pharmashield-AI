@@ -1,11 +1,36 @@
+# Environment
 .env
+.env.*
+!.env.example
+
+# Python
 __pycache__/
+*.py[cod]
+*.pyo
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
-backend/.venv/
-backend/pharmashield.db
+*.egg-info/
+*.egg
+dist/
+build/
+.venv/
+venv/
+
+# SQLite / local DBs
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads
 backend/storage/uploads/*
+!backend/storage/uploads/.gitkeep
+
+# Frontend
 frontend/.next/
 frontend/node_modules/
-.venv
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

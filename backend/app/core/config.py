@@ -17,6 +17,14 @@ class Settings(BaseSettings):
     # MongoDB
     database_url: str = ""
 
+    # PostgreSQL
+    postgres_url: str = ""
+
+    # Auth
+    secret_key: str = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"  # Default for MVP
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 1440 # 24 hours
+
     # LLM (mock for MVP)
     llm_provider: str = "mock"
     openai_api_key: str = ""
