@@ -27,11 +27,31 @@ export default function AdminSellerAnalyticsPage() {
       ) : error ? (
         <div className="glass-card" style={{ padding: '24px', color: '#f87171' }}>❌ {error}</div>
       ) : (
-        <div className="glass-card" style={{ padding: '24px' }}>
-          <p><strong>Total Seller Risk Checks:</strong> {data?.total_seller_risk_checks ?? 0}</p>
-          <p><strong>High Risk Seller Cases:</strong> {data?.high_risk_seller_cases ?? 0}</p>
-          <p style={{ color: 'var(--text-secondary)' }}>{data?.note ?? ''}</p>
-        </div>
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+            <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#60a5fa' }}>{data?.total_seller_checks ?? 0}</div>
+              <div style={{ marginTop: '8px' }}>Total Seller Checks</div>
+            </div>
+            <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#f87171' }}>{data?.high_risk_count ?? 0}</div>
+              <div style={{ marginTop: '8px' }}>High Risk Count</div>
+            </div>
+          </div>
+
+          {data?.flagged_sellers && data.flagged_sellers.length > 0 && (
+            <div className="glass-card" style={{ padding: '24px' }}>
+              <h3 style={{ marginBottom: '16px', fontWeight: 700 }}>Flagged Sellers</h3>
+              {data.flagged_sellers.map((seller: string, idx: number) => (
+                <div key={`${seller}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span>{seller}</span>
+                  <span style={{ color: '#f87171', fontWeight: 700 }}>HIGH RISK</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+
       )}
     </div>
   );

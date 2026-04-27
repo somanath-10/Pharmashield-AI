@@ -52,12 +52,10 @@ export default function DoctorDashboardPage() {
               <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '8px' }}>Pending ADR Reviews</div>
             </div>
           </Link>
-          <Link href="/doctor/pharmacist-questions" style={{ textDecoration: 'none' }}>
-            <div className="glass-card" style={{ padding: '24px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s', border: '1px solid rgba(251,191,36,0.3)' }}>
-              <div style={{ fontSize: '2.5rem', fontWeight: 800, color: '#fbbf24' }}>{dashboard?.pharmacist_questions || 0}</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '8px' }}>Pharmacist Inquiries</div>
-            </div>
-          </Link>
+          <div className="glass-card" style={{ padding: '24px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', opacity: 0.6 }}>
+            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: '#fbbf24' }}>{dashboard?.pharmacist_questions || 0}</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '8px' }}>Pharmacist Inquiries</div>
+          </div>
         </div>
       )}
 

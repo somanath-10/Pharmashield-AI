@@ -6,7 +6,7 @@ from app.services.documents.classifier import classify_document
 from app.services.documents.extractor import extract_medicines, extract_lab_values
 from app.services.rag.chunking import chunk_document
 from app.services.rag.embeddings import get_embedding_provider
-from app.services.rag.vector_store import vector_store
+from app.services.rag.vector_store import get_vector_store
 
 async def ingest_document(doc: UserDocument, text: str) -> Dict[str, Any]:
     # 1. Classify
@@ -77,6 +77,7 @@ async def ingest_document(doc: UserDocument, text: str) -> Dict[str, Any]:
         chunks_created += 1
 
     if points:
+        vector_store = get_vector_store()
         vector_store.insert_chunks(points)
 
     return {

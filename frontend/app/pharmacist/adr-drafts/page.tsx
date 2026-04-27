@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { createPharmacistADRDraft } from '@/lib/api';
 
 export default function ADRDraftsPage() {
-  const [formData, setFormData] = useState({ medicine_name: '', reaction: '', severity: 'Moderate', timeline: '', batch_number: '', patient_age_range: '' });
+  const [formData, setFormData] = useState({ case_id: '', medicine_name: '', reaction: '', severity: 'Moderate', timeline: '', batch_number: '', patient_age_range: '' });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -30,7 +30,7 @@ export default function ADRDraftsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
           <h2 style={{ fontSize: '1.6rem', fontWeight: 800 }}>⚠️ ADR Drafts</h2>
-          <p style={{ color: 'var(--text-secondary)' }}>Draft adverse drug reaction reports for Doctor review.</p>
+          <p style={{ color: 'var(--text-secondary)' }}>Draft adverse drug reaction reports for Doctor review. Requires a valid Case ID.</p>
         </div>
         <Link href="/pharmacist/dashboard" style={{ color: '#60a5fa', textDecoration: 'none' }}>← Back</Link>
       </div>
@@ -44,6 +44,9 @@ export default function ADRDraftsPage() {
       ) : (
         <form className="glass-card" style={{ padding: '28px' }} onSubmit={handleSubmit}>
           {error && <div style={{ marginBottom: '16px', color: '#f87171' }}>❌ {error}</div>}
+          <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Case ID (Required)</label>
+          <input required type="text" className="premium-input" style={{ marginBottom: '16px' }} value={formData.case_id} onChange={e => setFormData({...formData, case_id: e.target.value})} placeholder="e.g. draft-17141..." />
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
             <div>
               <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Medicine Name</label>

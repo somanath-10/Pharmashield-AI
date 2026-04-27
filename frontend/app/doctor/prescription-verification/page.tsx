@@ -9,6 +9,7 @@ export default function PrescriptionVerificationPage() {
   const [medicines, setMedicines] = useState<string[]>([]);
   const [result, setResult] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const addMedicine = () => {
     if (formData.medicine.trim()) {
@@ -26,7 +27,7 @@ export default function PrescriptionVerificationPage() {
         notes: formData.notes
       });
       setResult(res);
-    } catch(e) { console.error(e); }
+    } catch(e: any) { setError(e?.message || 'Failed to generate prescription'); }
     setLoading(false);
   };
 
@@ -41,6 +42,7 @@ export default function PrescriptionVerificationPage() {
       </div>
 
       <div className="glass-card" style={{ padding: '28px', marginBottom: '28px' }}>
+        {error && <div style={{ marginBottom: '16px', color: '#f87171' }}>❌ {error}</div>}
         <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Patient Name</label>
         <input required type="text" className="premium-input" style={{ marginBottom: '16px' }} value={formData.patient_name} onChange={e => setFormData({...formData, patient_name: e.target.value})} />
 

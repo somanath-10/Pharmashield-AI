@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from app.services.rag.vector_store import vector_store
+from app.services.rag.vector_store import get_vector_store
 from app.services.rag.keyword_store import KeywordStore
 from app.services.rag.query_expansion import expand_query
 from app.services.rag.reranker import rerank_chunks
@@ -13,6 +13,7 @@ async def hybrid_retrieve(query: str, case_id: str, role: str) -> List[Dict[str,
     # 2. Vector Search
     embedding_provider = get_embedding_provider()
     query_vector = await embedding_provider.embed_text(expanded_query)
+    vector_store = get_vector_store()
     vector_results = vector_store.search(query_vector, case_id, limit=5)
     
     # 3. Keyword Search

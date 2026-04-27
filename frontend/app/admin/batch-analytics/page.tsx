@@ -39,12 +39,12 @@ export default function AdminBatchAnalyticsPage() {
               <div style={{ marginTop: '8px' }}>Flagged Batches</div>
             </div>
             <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#60a5fa' }}>{data.total_batch_checks ?? 0}</div>
+              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#60a5fa' }}>{data.total_checked ?? 0}</div>
               <div style={{ marginTop: '8px' }}>Total Batch Checks</div>
             </div>
             <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1rem', fontWeight: 600, color: '#f97316', minHeight: '2.5rem' }}>{data.note ?? 'No note available'}</div>
-              <div style={{ marginTop: '8px' }}>Status Note</div>
+              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#f97316' }}>{data.total_quarantined ?? 0}</div>
+              <div style={{ marginTop: '8px' }}>Quarantined</div>
             </div>
           </div>
 

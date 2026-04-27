@@ -184,6 +184,9 @@ async def reply_to_message(
     )
     if not original:
         raise HTTPException(status_code=404, detail="Message not found")
+    
+    if original.receiver_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to reply to this message")
 
     reply = DoctorPharmacistMessage(
         case_id=original.case_id,
@@ -215,6 +218,10 @@ async def substitution_decision(
     valid_decisions = {"APPROVED", "REJECTED", "NEEDS_MONITORING"}
     if req.decision not in valid_decisions:
         raise HTTPException(status_code=400, detail=f"Decision must be one of: {valid_decisions}")
+
+    case = await Case.find_one(Case.case_id == req.case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
 
     review = DoctorReview(
         case_id=req.case_id,
@@ -263,7 +270,7 @@ async def create_care_team_link(
     await link.insert()
     await record_audit_log(current_user.user_id, "DOCTOR", "CARE_TEAM_LINK_CREATED", "care_team",
                            metadata={"patient_id": req.patient_id})
-    return {"link_id": link.link_id, "status": "PENDING"}
+    return {"link_id": link.link_id, "status": "ACTIVE"}
 
 @router.get("/care-team-links")
 async def get_care_team_links(current_user: User = Depends(get_current_doctor)) -> Any:

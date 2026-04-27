@@ -9,19 +9,29 @@ export default function PrescriptionCheckPage() {
   const [result, setResult] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState('');
+  const [error, setError] = useState('');
 
   const handleAnalyze = async () => {
     if (!file) return;
     setLoading(true); setStep('Creating Case...');
     try {
       const { case_id } = await createCase({ role: 'PHARMACIST', case_type: 'PHARMACIST_DISPENSING_CHECK', title: 'Rx Authenticity Check', query: 'Verify prescription' });
-      setStep('Uploading...');
-      await uploadDocument(case_id, file);
+      const uploadRes = await uploadDocument(case_id, file);
+      if (uploadRes.status === 'OCR_PENDING') {
+        setResult({
+          risk_level: 'UNKNOWN',
+          answer: {
+            prescription_summary: uploadRes.message
+          }
+        });
+        setLoading(false); setStep('');
+        return;
+      }
       setStep('Analyzing authenticity...');
       const res = await analyzeCase(case_id, 'Verify doctor details and date', {});
       setResult(res);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to check prescription');
     }
     setLoading(false); setStep('');
   };
@@ -37,7 +47,8 @@ export default function PrescriptionCheckPage() {
       </div>
 
       <div className="glass-card" style={{ padding: '28px', marginBottom: '28px' }}>
-        <input type="file" accept=".pdf,.jpg,.png" onChange={e => e.target.files?.[0] && setFile(e.target.files[0])} style={{ marginBottom: '20px', display: 'block', color: 'white' }} />
+        {error && <div style={{ marginBottom: '16px', color: '#f87171' }}>❌ {error}</div>}
+        <input type="file" accept=".pdf,.jpg,.png" onChange={e => { setError(''); e.target.files?.[0] && setFile(e.target.files[0]); }} style={{ marginBottom: '20px', display: 'block', color: 'white' }} />
         <button className={`btn-primary ${loading ? 'btn-disabled' : ''}`} onClick={handleAnalyze} disabled={loading || !file} style={{ width: '100%', justifyContent: 'center' }}>
           {loading ? step : 'Run Check'}
         </button>

@@ -7,13 +7,14 @@ import { getDoctorADRReviews, reviewDoctorADR } from '@/lib/api';
 export default function ADRReviewPage() {
   const [adrs, setAdrs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const loadADRs = async () => {
     setLoading(true);
     try {
       const res = await getDoctorADRReviews();
       setAdrs(res);
-    } catch(e) { console.error(e); }
+    } catch(e: any) { setError(e?.message || 'Failed to load ADR reviews'); }
     setLoading(false);
   };
 
@@ -23,7 +24,7 @@ export default function ADRReviewPage() {
     try {
       await reviewDoctorADR(id, { action, notes: `Doctor marked as ${action}` });
       await loadADRs();
-    } catch(e) { console.error(e); }
+    } catch(e: any) { setError(e?.message || 'Failed to submit review'); }
   };
 
   return (
@@ -37,6 +38,7 @@ export default function ADRReviewPage() {
       </div>
 
       <div className="glass-card" style={{ padding: '24px' }}>
+        {error && <div style={{ marginBottom: '16px', color: '#f87171' }}>❌ {error}</div>}
         {loading ? (
           <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>Loading...</div>
         ) : adrs.length === 0 ? (

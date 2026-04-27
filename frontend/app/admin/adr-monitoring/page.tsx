@@ -13,7 +13,7 @@ const SEV_COLORS: Record<string, string> = {
 
 export default function AdminADRMonitoringPage() {
   const [adrs, setAdrs] = useState<any[]>([]);
-  const [summary, setSummary] = useState<{ total_adr_drafts?: number; pending_doctor_review?: number; submitted_externally?: number } | null>(null);
+  const [summary, setSummary] = useState<{ total_adr_reports?: number; pending_doctor_review?: number; reviewed?: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -47,16 +47,16 @@ export default function AdminADRMonitoringPage() {
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
             <div className="glass-card" style={{ padding: '16px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{summary?.total_adr_drafts ?? 0}</div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Total Drafts</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{summary?.total_adr_reports ?? 0}</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Total Reports</div>
             </div>
             <div className="glass-card" style={{ padding: '16px', textAlign: 'center' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{summary?.pending_doctor_review ?? 0}</div>
               <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Pending Doctor Review</div>
             </div>
             <div className="glass-card" style={{ padding: '16px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{summary?.submitted_externally ?? 0}</div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Submitted Externally</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{summary?.reviewed ?? 0}</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Reviewed</div>
             </div>
           </div>
           {adrs.length === 0 ? (

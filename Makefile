@@ -12,10 +12,10 @@ seed-users:
 	$(COMPOSE) run --rm backend python scripts/seed_demo_users.py
 
 test:
-	$(COMPOSE) run --rm -e APP_ENV=test backend pytest app/tests -q -m "not integration"
+	$(COMPOSE) run --rm -e APP_ENV=test -e QDRANT_URL=:memory: backend pytest app/tests -q -m "not integration"
 
 test-unit:
-	$(COMPOSE) run --rm -e APP_ENV=test backend pytest app/tests -q -m "not integration"
+	$(COMPOSE) run --rm -e APP_ENV=test -e QDRANT_URL=:memory: backend pytest app/tests -q -m "not integration"
 
 test-integration:
 	$(COMPOSE) run --rm backend pytest app/tests -q -m "integration"
@@ -27,7 +27,10 @@ logs:
 	$(COMPOSE) logs -f backend frontend
 
 clean-zip:
+	rm -f Pharmashield-AI-final.zip
 	zip -r Pharmashield-AI-final.zip . \
-	  -x ".git/*" "*/.git/*" ".next/*" "*/.next/*" "node_modules/*" "*/node_modules/*" "*/__pycache__/*" \
-	  ".pytest_cache/*" "*/.pytest_cache/*" ".DS_Store" "*/.DS_Store" "__MACOSX/*" "*/__MACOSX/*" "*.env" \
-	  "*.egg-info/*" "*/venv/*" "*.tsbuildinfo"
+	  -x ".git/*" "*/.git/*" ".next/*" "*/.next/*" "node_modules/*" "*/node_modules/*" \
+	  "*/__pycache__/*" ".pytest_cache/*" "*/.pytest_cache/*" ".DS_Store" "*/.DS_Store" \
+	  "__MACOSX/*" "*/__MACOSX/*" "*.env" "*.env.test" "*.egg-info/*" "*/venv/*" \
+	  "*.tsbuildinfo" "backend/pharmashield_ai_backend.egg-info/*" \
+	  "frontend/.next/*" "*/coverage/*" ".nyc_output/*"

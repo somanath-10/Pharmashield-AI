@@ -84,4 +84,10 @@ class QdrantVectorStore:
             return []
 
 
-vector_store = QdrantVectorStore()
+_vector_store = None
+
+def get_vector_store() -> QdrantVectorStore:
+    global _vector_store
+    if _vector_store is None:
+        _vector_store = QdrantVectorStore()
+    return _vector_store

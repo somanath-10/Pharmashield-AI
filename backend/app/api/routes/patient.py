@@ -56,7 +56,7 @@ async def report_side_effect(
         severity=report_in.severity,
         timeline=report_in.timeline,
         patient_age_range=report_in.patient_age_range,
-        status="DRAFT"
+        status="NEEDS_DOCTOR_REVIEW"
     )
     await adr.insert()
     return adr
