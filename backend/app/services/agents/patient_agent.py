@@ -13,14 +13,21 @@ class PatientAgent:
         case: Case,
         retrieved_chunks: List[Dict[str, Any]],
         intel_results: List[Dict[str, Any]] | None = None,
+        query: str = "",
     ) -> Dict[str, Any]:
         medicines = []
         lab_values = []
+        relevant_context = []
 
         for chunk in retrieved_chunks:
             payload = chunk.get("payload", {})
             chunk_type = payload.get("chunk_type", "")
             text = payload.get("chunk_text", "").lower()
+            
+            # Simple keyword matching for relevance
+            query_terms = [t.lower() for t in query.split() if len(t) > 3]
+            if not query_terms or any(t in text for t in query_terms):
+                relevant_context.append(payload.get("chunk_text", ""))
 
             if chunk_type == "medicine" or any(m in text for m in ["metformin", "amoxicillin", "augmentin", "paracetamol"]):
                 medicine_name = payload.get("medicine_name") or payload.get("section_title") or "Prescribed Medicine"
@@ -34,14 +41,23 @@ class PatientAgent:
         # Summarise document content
         has_meds = len(medicines) > 0
         has_labs = len(lab_values) > 0
-        if has_meds and has_labs:
-            simple_summary = "Your documents contain information about your medicines and lab test results."
-        elif has_meds:
-            simple_summary = "Your documents contain information about your medicines."
-        elif has_labs:
-            simple_summary = "Your documents contain information about your lab tests."
+        
+        # Synthesize answer from RAG chunks
+        if relevant_context:
+            rag_answer = f"Based on your documents: {relevant_context[0]}"
+            if len(relevant_context) > 1:
+                rag_answer += f" {relevant_context[1]}"
         else:
-            simple_summary = "Your documents were reviewed. Please ask your specific question for a detailed explanation."
+            rag_answer = "I couldn't find a specific answer in your documents. Please ensure the documents are clear and relevant to your question."
+
+        if has_meds and has_labs:
+            simple_summary = f"Your documents contain information about medicines ({', '.join(medicines[:3])}) and lab results ({', '.join(lab_values[:2])})."
+        elif has_meds:
+            simple_summary = f"Your documents contain information about your medicines: {', '.join(medicines[:3])}."
+        elif has_labs:
+            simple_summary = f"Your documents contain information about your lab tests: {', '.join(lab_values[:2])}."
+        else:
+            simple_summary = "Your documents were reviewed."
 
         # Incorporate Phase 3 intel
         affordability_note = ""
@@ -65,6 +81,7 @@ class PatientAgent:
             intel_actions.extend(ir.get("actions", []))
 
         return {
+            "answer": rag_answer,
             "simple_summary": simple_summary,
             "medicines_found": medicines,
             "lab_values_found": lab_values,

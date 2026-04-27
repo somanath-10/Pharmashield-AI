@@ -13,12 +13,20 @@ class PharmacistAgent:
         case: Case,
         retrieved_chunks: List[Dict[str, Any]],
         intel_results: List[Dict[str, Any]] | None = None,
+        query: str = "",
     ) -> Dict[str, Any]:
         medicines = []
+        relevant_context = []
         for chunk in retrieved_chunks:
             payload = chunk.get("payload", {})
             chunk_type = payload.get("chunk_type", "")
             text = payload.get("chunk_text", "").lower()
+            
+            # Simple keyword matching for relevance
+            query_terms = [t.lower() for t in query.split() if len(t) > 3]
+            if not query_terms or any(t in text for t in query_terms):
+                relevant_context.append(payload.get("chunk_text", ""))
+
             if chunk_type == "medicine" or any(m in text for m in ["amoxicillin", "augmentin", "metformin", "paracetamol"]):
                 name = payload.get("medicine_name") or payload.get("section_title") or "Prescribed Medicine"
                 medicines.append(name)
@@ -53,8 +61,15 @@ class PharmacistAgent:
             elif "seller" in agent:
                 seller_risk.extend(ir.get("red_flags", ir.get("findings", [])))
 
+        # Synthesize summary from RAG chunks
+        if relevant_context:
+            rag_summary = f"RAG Insights: {relevant_context[0][:200]}..."
+        else:
+            rag_summary = "Review of case documents for dispensing support."
+
         return {
-            "prescription_summary": "Review of case documents for dispensing support.",
+            "answer": rag_summary,
+            "prescription_summary": rag_summary,
             "medicines_found": medicines,
             "compliance_warnings": compliance_warnings or ["Verify prescription validity before dispensing."],
             "nsq_batch_status": nsq_warnings or ["No NSQ alerts found for provided details."],

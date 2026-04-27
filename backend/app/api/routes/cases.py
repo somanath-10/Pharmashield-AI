@@ -222,10 +222,10 @@ async def analyze_case(case_id: str, request: Optional[AnalyzeRequest] = None, c
 
     if target_case.role == RoleEnum.PATIENT:
         agent = PatientAgent()
-        result_data = await agent.analyze(target_case, retrieved_chunks, intel_results)
+        result_data = await agent.analyze(target_case, retrieved_chunks, intel_results, query=query)
     elif target_case.role == RoleEnum.PHARMACIST:
         agent = PharmacistAgent()
-        result_data = await agent.analyze(target_case, retrieved_chunks, intel_results)
+        result_data = await agent.analyze(target_case, retrieved_chunks, intel_results, query=query)
     elif target_case.role == RoleEnum.DOCTOR:
         agent = DoctorAgent()
         result_data = await agent.analyze(target_case, retrieved_chunks, intel_results)
