@@ -39,7 +39,7 @@ export default function BatchVerificationPage() {
           </div>
           <div>
             <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Batch Number</label>
-            <input required type="text" className="premium-input" value={formData.batch_number} onChange={e => setFormData({...formData, batch_number: e.target.value})} placeholder="Ends in X = Mock Spurious" />
+            <input required type="text" className="premium-input" value={formData.batch_number} onChange={e => setFormData({...formData, batch_number: e.target.value})} placeholder="Enter batch number from medicine strip" />
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>

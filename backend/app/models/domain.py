@@ -58,6 +58,7 @@ class User(Document):
     user_id: Indexed(str) = Field(default_factory=uuid_str)
     name: str
     email: Optional[str] = None
+    hashed_password: str = "placeholder_hashed_password" # For Phase 4 compliance
     phone: Optional[str] = None
     role: RoleEnum
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -312,3 +313,18 @@ class DoctorPharmacistMessage(Document):
 
     class Settings:
         name = "doctor_pharmacist_messages"
+
+class VerifiedPrescription(Document):
+    """Stores metadata for doctor-verified e-prescriptions to prevent fake prescription misuse."""
+    verification_id: Indexed(str) = Field(default_factory=uuid_str)
+    doctor_id: Indexed(str)
+    patient_name: str
+    patient_id: Optional[str] = None
+    medicine_list: List[str] = Field(default_factory=list)
+    notes: Optional[str] = None
+    status: str = "ACTIVE"  # ACTIVE | REVOKED | EXPIRED
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: Optional[datetime] = None
+
+    class Settings:
+        name = "verified_prescriptions"

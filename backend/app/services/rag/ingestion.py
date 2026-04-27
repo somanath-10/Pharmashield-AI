@@ -1,7 +1,7 @@
 from typing import Dict, Any
 import uuid
 from qdrant_client.http.models import PointStruct
-from app.models.domain import UserDocument, DocumentChunk, ExtractedMedicine, ExtractedLabValue
+from app.models.domain import UserDocument, DocumentChunk, ExtractedMedicine, ExtractedLabValue, DocumentTypeEnum
 from app.services.documents.classifier import classify_document
 from app.services.documents.extractor import extract_medicines, extract_lab_values
 from app.services.rag.chunking import chunk_document
@@ -17,7 +17,7 @@ async def ingest_document(doc: UserDocument, text: str) -> Dict[str, Any]:
 
     # 2. Extract structured data
     medicines = []
-    if doc_type == "PRESCRIPTION":
+    if doc_type == DocumentTypeEnum.PRESCRIPTION:
         meds_data = extract_medicines(text)
         for md in meds_data:
             m = ExtractedMedicine(case_id=doc.case_id, document_id=doc.document_id, **md)
@@ -25,7 +25,7 @@ async def ingest_document(doc: UserDocument, text: str) -> Dict[str, Any]:
             medicines.append(m)
 
     lab_values = []
-    if doc_type == "LAB_REPORT":
+    if doc_type == DocumentTypeEnum.LAB_REPORT:
         labs_data = extract_lab_values(text)
         for ld in labs_data:
             l = ExtractedLabValue(case_id=doc.case_id, document_id=doc.document_id, **ld)

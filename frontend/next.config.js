@@ -4,11 +4,15 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8000/api/:path*',
+        destination: process.env.INTERNAL_API_BASE_URL
+          ? `${process.env.INTERNAL_API_BASE_URL}/api/:path*`
+          : 'http://localhost:8000/api/:path*',
       },
       {
         source: '/auth/:path*',
-        destination: 'http://localhost:8000/auth/:path*',
+        destination: process.env.INTERNAL_API_BASE_URL
+          ? `${process.env.INTERNAL_API_BASE_URL}/auth/:path*`
+          : 'http://localhost:8000/auth/:path*',
       },
     ];
   },

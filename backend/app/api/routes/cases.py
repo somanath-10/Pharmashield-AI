@@ -35,9 +35,12 @@ async def create_case(
     request: CaseCreateRequest,
     current_user: User = Depends(get_current_active_user)
 ) -> CaseRecordResponse:
+    if request.role != current_user.role and current_user.role != RoleEnum.ADMIN:
+        raise HTTPException(status_code=403, detail="Cannot create case for another role")
+
     new_case = Case(
         user_id=current_user.user_id,
-        role=request.role,
+        role=current_user.role if current_user.role != RoleEnum.ADMIN else request.role,
         case_type=request.case_type,
         title=request.title,
         query=request.query
@@ -63,6 +66,8 @@ async def get_case(case_id: str, current_user: User = Depends(get_current_active
     case = await Case.find_one(Case.case_id == case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+    if case.user_id != current_user.user_id and current_user.role != RoleEnum.ADMIN:
+        raise HTTPException(status_code=403, detail="Not authorized")
     return CaseRecordResponse.model_validate(case.model_dump())
 
 
@@ -76,6 +81,8 @@ async def search_documents(case_id: str, request: SearchRequest, current_user: U
     target_case = await Case.find_one(Case.case_id == case_id)
     if not target_case:
         raise HTTPException(status_code=404, detail="Case not found")
+    if target_case.user_id != current_user.user_id and current_user.role != RoleEnum.ADMIN:
+        raise HTTPException(status_code=403, detail="Not authorized")
     chunks = await hybrid_retrieve(request.query, case_id, request.role)
     citations = build_citations(chunks)
     return {"results": citations}
@@ -92,6 +99,8 @@ async def analyze_case(case_id: str, request: Optional[AnalyzeRequest] = None, c
     target_case = await Case.find_one(Case.case_id == case_id)
     if not target_case:
         raise HTTPException(status_code=404, detail="Case not found")
+    if target_case.user_id != current_user.user_id and current_user.role != RoleEnum.ADMIN:
+        raise HTTPException(status_code=403, detail="Not authorized")
 
     ctx = (request.context or {}) if request else {}
     query = (request.question or target_case.query) if request else target_case.query
@@ -232,7 +241,8 @@ async def analyze_case(case_id: str, request: Optional[AnalyzeRequest] = None, c
     )
     await run.insert()
 
-    target_case.status = "COMPLETED"
+    from app.models.domain import CaseStatusEnum
+    target_case.status = CaseStatusEnum.ANALYZED
     target_case.risk_level = overall_risk
     target_case.final_summary = json.dumps(result_data)
     await target_case.save()
@@ -254,7 +264,7 @@ async def analyze_case(case_id: str, request: Optional[AnalyzeRequest] = None, c
         "case_id": case_id,
         "role": target_case.role.value,
         "risk_level": overall_risk,
-        "status": "COMPLETED",
+        "status": target_case.status.value,
         "agents_run": agents_run,
         "answer": result_data,
         "intel_findings": intel_findings,

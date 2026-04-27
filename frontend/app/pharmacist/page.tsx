@@ -172,7 +172,9 @@ export default function PharmacistDashboard() {
               <span style={{ background: `${RISK_COLORS[result.risk_level]}22`, color: RISK_COLORS[result.risk_level], borderRadius: '999px', padding: '3px 14px', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', border: `1px solid ${RISK_COLORS[result.risk_level]}44` }}>
                 {result.risk_level}
               </span>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Agents: {result.agents_run.join(', ')}</span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                {result.agents_run.length} safety check{result.agents_run.length !== 1 ? 's' : ''} completed
+              </span>
             </div>
 
             {/* Prescription Summary */}

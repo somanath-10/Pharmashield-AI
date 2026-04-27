@@ -21,7 +21,8 @@ from app.models.domain import (
     ADRReport,
     PharmacistReview,
     DoctorReview,
-    DoctorPharmacistMessage
+    DoctorPharmacistMessage,
+    VerifiedPrescription,
 )
 from app.services.memory.memory_store import MemoryEntry
 
@@ -59,7 +60,8 @@ async def init_db() -> None:
             ADRReport,
             PharmacistReview,
             DoctorReview,
-            DoctorPharmacistMessage
+            DoctorPharmacistMessage,
+            VerifiedPrescription,
         ],
     )
     logger.info("MongoDB and Beanie ODM initialized successfully.")

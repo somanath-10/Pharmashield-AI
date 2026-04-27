@@ -145,7 +145,9 @@ export default function PatientDashboard() {
               {result.risk_level}
             </span>
             {(result.agents_run?.length ?? 0) > 0 && (
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Agents: {result.agents_run.join(', ')}</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {result.agents_run.length} check{result.agents_run.length !== 1 ? 's' : ''} completed
+              </span>
             )}
           </div>
 
