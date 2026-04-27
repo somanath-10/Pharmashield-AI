@@ -1,10 +1,25 @@
 from typing import List, Any
 from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_current_pharmacist
-from app.models.domain import User, Case, BatchVerification, PrescriptionExtraction, PriceComplianceCheck, SubstitutionCheck, ADRReport, PharmacistReview
+from app.models.domain import (
+    User, Case, BatchVerification, PrescriptionExtraction,
+    PriceComplianceCheck, SubstitutionCheck, ADRReport,
+    PharmacistReview, CaseStatusEnum
+)
+from app.services.audit import record_audit_log
 from pydantic import BaseModel
 
 router = APIRouter()
+
+# ─── Dispensing Decision Statuses ─────────────────────────────────────────────
+
+DISPENSING_STATUSES = {
+    "CAN_DISPENSE": "Prescription verified and medicine is safe to dispense.",
+    "NEEDS_DOCTOR_CLARIFICATION": "Prescription requires doctor confirmation before dispensing.",
+    "NEEDS_PATIENT_CONFIRMATION": "Awaiting patient confirmation (e.g. allergy check, affordability).",
+    "QUARANTINE_BATCH": "Batch flagged as suspicious. Do not dispense until verified.",
+    "DO_NOT_DISPENSE": "Do not dispense. Prescription is invalid or medicine is unsafe.",
+}
 
 class PharmacistDashboardResponse(BaseModel):
     pending_verifications: int
@@ -39,7 +54,7 @@ class BatchCheckReq(BaseModel):
 @router.post("/batch-check", response_model=BatchVerification)
 async def perform_batch_check(req: BatchCheckReq, current_user: User = Depends(get_current_pharmacist)) -> Any:
     """Verify a batch and optionally flag it as quarantined."""
-    # Mock behavior: Any batch ending in 'X' is flagged spurious
+    # Heuristic: any batch ending in 'X' matches mock NSQ spurious dataset seed
     is_spurious = req.batch_number.upper().endswith('X')
     
     batch = BatchVerification(
@@ -50,10 +65,12 @@ async def perform_batch_check(req: BatchCheckReq, current_user: User = Depends(g
         manufacturer=req.manufacturer,
         supplier=req.supplier,
         is_quarantined=is_spurious,
-        quarantine_reason="NSQ Database Match" if is_spurious else None,
+        quarantine_reason="Flagged in NSQ seed database" if is_spurious else None,
         risk_level="HIGH" if is_spurious else "LOW"
     )
     await batch.insert()
+    await record_audit_log(current_user.user_id, "PHARMACIST", "PHARMACIST_BATCH_CHECK", "batch",
+                           metadata={"batch_number": req.batch_number, "quarantined": is_spurious})
     return batch
 
 class PriceCheckReq(BaseModel):
@@ -64,7 +81,7 @@ class PriceCheckReq(BaseModel):
 
 @router.post("/price-check", response_model=PriceComplianceCheck)
 async def perform_price_check(req: PriceCheckReq, current_user: User = Depends(get_current_pharmacist)) -> Any:
-    """Check for overpricing."""
+    """Check for overpricing against MRP."""
     is_overcharged = req.charged_price > req.mrp
     
     check = PriceComplianceCheck(
@@ -75,6 +92,8 @@ async def perform_price_check(req: PriceCheckReq, current_user: User = Depends(g
         is_overcharged=is_overcharged
     )
     await check.insert()
+    await record_audit_log(current_user.user_id, "PHARMACIST", "PHARMACIST_PRICE_CHECK", "price",
+                           metadata={"medicine": req.medicine_name, "overcharged": is_overcharged})
     return check
 
 class SubstitutionCheckReq(BaseModel):
@@ -84,8 +103,7 @@ class SubstitutionCheckReq(BaseModel):
 
 @router.post("/substitution-check", response_model=SubstitutionCheck)
 async def check_substitution(req: SubstitutionCheckReq, current_user: User = Depends(get_current_pharmacist)) -> Any:
-    """Check if generic substitution is safe."""
-    # Mocking behavior
+    """Check if a generic substitution is safe (same molecule comparison)."""
     is_safe = req.prescribed_medicine.split()[0].lower() == req.substituted_medicine.split()[0].lower()
     
     sub = SubstitutionCheck(
@@ -93,9 +111,11 @@ async def check_substitution(req: SubstitutionCheckReq, current_user: User = Dep
         prescribed_medicine=req.prescribed_medicine,
         substituted_medicine=req.substituted_medicine,
         is_safe=is_safe,
-        mismatch_reasons=[] if is_safe else ["Different active molecule suspected"]
+        mismatch_reasons=[] if is_safe else ["Different active molecule suspected — consult doctor"]
     )
     await sub.insert()
+    await record_audit_log(current_user.user_id, "PHARMACIST", "PHARMACIST_SUBSTITUTION_CHECK", "substitution",
+                           metadata={"safe": is_safe})
     return sub
 
 class ADRDraftReq(BaseModel):
@@ -121,6 +141,8 @@ async def create_adr_draft(req: ADRDraftReq, current_user: User = Depends(get_cu
         status="NEEDS_DOCTOR_REVIEW"
     )
     await adr.insert()
+    await record_audit_log(current_user.user_id, "PHARMACIST", "CREATE_ADR_REPORT", "adr_report",
+                           metadata={"medicine": req.medicine_name, "severity": req.severity})
     return adr
 
 class ReviewReq(BaseModel):
@@ -135,7 +157,7 @@ async def submit_review(case_id: str, req: ReviewReq, current_user: User = Depen
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
         
-    case.status = "PHARMACIST_REVIEWED"
+    case.status = CaseStatusEnum.PHARMACIST_REVIEWED
     await case.save()
     
     review = PharmacistReview(
@@ -145,4 +167,70 @@ async def submit_review(case_id: str, req: ReviewReq, current_user: User = Depen
         notes=req.notes
     )
     await review.insert()
+    await record_audit_log(current_user.user_id, "PHARMACIST", "PHARMACIST_REVIEW_SUBMITTED", "case",
+                           case_id=case_id, metadata={"action": req.action_taken})
     return review
+
+# ─── Dispensing Decision ──────────────────────────────────────────────────────
+
+class DispensingDecisionReq(BaseModel):
+    case_id: str
+    medicine_name: str
+    dispensing_status: str  # One of DISPENSING_STATUSES keys
+    notes: str | None = None
+
+@router.post("/dispensing-decision")
+async def record_dispensing_decision(
+    req: DispensingDecisionReq,
+    current_user: User = Depends(get_current_pharmacist)
+) -> Any:
+    """
+    Record the final dispensing decision for a case.
+    Status must be one of: CAN_DISPENSE | NEEDS_DOCTOR_CLARIFICATION |
+    NEEDS_PATIENT_CONFIRMATION | QUARANTINE_BATCH | DO_NOT_DISPENSE
+    """
+    if req.dispensing_status not in DISPENSING_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status. Must be one of: {list(DISPENSING_STATUSES.keys())}"
+        )
+
+    case = await Case.find_one(Case.case_id == req.case_id)
+    if case:
+        # Update case status based on dispensing decision
+        if req.dispensing_status == "CAN_DISPENSE":
+            case.status = CaseStatusEnum.RESOLVED
+        elif req.dispensing_status == "DO_NOT_DISPENSE":
+            case.status = CaseStatusEnum.ESCALATED
+        elif req.dispensing_status in ("NEEDS_DOCTOR_CLARIFICATION", "QUARANTINE_BATCH"):
+            case.status = CaseStatusEnum.NEEDS_REVIEW
+        else:
+            case.status = CaseStatusEnum.PHARMACIST_REVIEWED
+        await case.save()
+
+    # Record as a PharmacistReview
+    review = PharmacistReview(
+        case_id=req.case_id,
+        pharmacist_id=current_user.user_id,
+        action_taken=req.dispensing_status,
+        notes=req.notes or DISPENSING_STATUSES[req.dispensing_status],
+    )
+    await review.insert()
+    await record_audit_log(
+        current_user.user_id, "PHARMACIST", "PHARMACIST_DISPENSING_DECISION", "dispensing",
+        case_id=req.case_id,
+        metadata={"status": req.dispensing_status, "medicine": req.medicine_name}
+    )
+
+    return {
+        "status": req.dispensing_status,
+        "description": DISPENSING_STATUSES[req.dispensing_status],
+        "medicine": req.medicine_name,
+        "case_id": req.case_id,
+    }
+
+@router.get("/dispensing-statuses")
+async def get_dispensing_statuses(current_user: User = Depends(get_current_pharmacist)):
+    """Return all valid dispensing decision statuses and their descriptions."""
+    return [{"status": k, "description": v} for k, v in DISPENSING_STATUSES.items()]
+

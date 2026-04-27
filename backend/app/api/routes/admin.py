@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List
 from fastapi import APIRouter, Depends
-from app.models.domain import Case, Feedback, AgentRun, User, RoleEnum, RiskLevelEnum, CaseStatusEnum
+from app.models.domain import Case, Feedback, AgentRun, User, RoleEnum, RiskLevelEnum, CaseStatusEnum, DataSourceSyncStatus
 from app.api.deps import get_current_admin
 from app.services.audit import get_audit_logs
 
@@ -159,13 +159,31 @@ async def get_adr_monitoring(current_user: User = Depends(get_current_admin)) ->
 
 @router.get("/data-sources")
 async def get_data_sources(current_user: User = Depends(get_current_admin)) -> List[Dict[str, Any]]:
-    """Status of external data source adapters."""
+    """Status of external data source adapters, backed by DataSourceSyncStatus model."""
+    # Ensure seed records exist for known sources
+    SEED_SOURCES = [
+        {"source_name": "NSQ_SPURIOUS", "status": "MOCK_MODE", "note": "Seed data active. Connect CDSCO API for live data."},
+        {"source_name": "NPPA_PRICE", "status": "MOCK_MODE", "note": "Mock price adapter active. Connect NPPA portal for live data."},
+        {"source_name": "JAN_AUSHADHI", "status": "MOCK_MODE", "note": "Static seed list active. Connect Jan Aushadhi API for live updates."},
+        {"source_name": "PVPI_ADR", "status": "NOT_CONNECTED", "note": "Pending external integration with PvPI/CDSCO."},
+        {"source_name": "QDRANT_VECTOR_STORE", "status": "MEMORY_MODE", "note": "Running in-memory. Set QDRANT_URL to a persistent instance for production."},
+    ]
+    for seed in SEED_SOURCES:
+        existing = await DataSourceSyncStatus.find_one(DataSourceSyncStatus.source_name == seed["source_name"])
+        if not existing:
+            await DataSourceSyncStatus(**seed).insert()
+
+    all_sources = await DataSourceSyncStatus.find_all().to_list()
     return [
-        {"name": "NSQ / Spurious Drug Dataset", "status": "MOCK_MODE", "last_synced": None, "note": "Seed data active. Connect CDSCO API for live data."},
-        {"name": "NPPA / DPCO Price Dataset", "status": "MOCK_MODE", "last_synced": None, "note": "Mock price adapter active. Connect NPPA portal for live data."},
-        {"name": "Jan Aushadhi Generic Directory", "status": "MOCK_MODE", "last_synced": None, "note": "Static seed list active. Connect Jan Aushadhi API for live updates."},
-        {"name": "PvPI / ADR Reports (CDSCO)", "status": "NOT_CONNECTED", "last_synced": None, "note": "Pending external integration."},
-        {"name": "Qdrant Vector Store", "status": "MEMORY_MODE", "last_synced": None, "note": "Running in-memory. Connect a persistent Qdrant instance for production."},
+        {
+            "source_name": s.source_name,
+            "status": s.status,
+            "last_synced": s.last_synced.isoformat() if s.last_synced else None,
+            "records_loaded": s.records_loaded,
+            "note": s.note,
+            "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+        }
+        for s in all_sources
     ]
 
 

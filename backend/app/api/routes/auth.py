@@ -21,7 +21,7 @@ class RegisterRequest(BaseModel):
 
 @router.post("/register", response_model=Token)
 async def register(req: RegisterRequest) -> Token:
-    existing = await User.find_one(User.email == req.email)
+    existing = await User.find_one({"email": req.email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
         

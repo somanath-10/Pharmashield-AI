@@ -1,7 +1,12 @@
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Optional
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_current_doctor
-from app.models.domain import User, Case, ADRReport, DoctorReview, DoctorPharmacistMessage
+from app.models.domain import (
+    User, Case, ADRReport, DoctorReview,
+    DoctorPharmacistMessage, VerifiedPrescription
+)
+from app.services.audit import record_audit_log
 from pydantic import BaseModel
 import uuid
 
@@ -16,34 +21,49 @@ class DoctorDashboardResponse(BaseModel):
 async def get_doctor_dashboard(current_user: User = Depends(get_current_doctor)) -> Any:
     """Get aggregate metrics for the doctor."""
     adrs = await ADRReport.find(ADRReport.status == "NEEDS_DOCTOR_REVIEW").to_list()
-    # Mock active patients
+    msgs = await DoctorPharmacistMessage.find(
+        DoctorPharmacistMessage.receiver_id == current_user.user_id
+    ).to_list()
+    # Count cases where doctor has reviewed or that belong to doctor
+    doctor_cases = await Case.find(Case.role == "DOCTOR").to_list()
     return DoctorDashboardResponse(
         adr_reviews_pending=len(adrs),
-        pharmacist_questions=0,
-        active_patients=12
+        pharmacist_questions=len(msgs),
+        active_patients=len(set(c.user_id for c in doctor_cases))
     )
 
 @router.get("/patients", response_model=List[Dict[str, Any]])
 async def get_patients(current_user: User = Depends(get_current_doctor)) -> Any:
-    """Get a list of patient clinical summaries."""
-    # Since we don't have a formal patient mapping directly to doctors in the MVP, 
-    # we'll return mock structured patient summaries.
-    return [
-        {
-            "patient_id": "P-001",
-            "name": "Arun Kumar",
-            "age": 45,
-            "current_medicines": ["Metformin 500mg", "Atorvastatin 10mg"],
-            "recent_flags": ["Possible mild ADR reported"]
-        },
-        {
-            "patient_id": "P-002",
-            "name": "Priya Singh",
-            "age": 32,
-            "current_medicines": ["Thyroxine 50mcg"],
-            "recent_flags": []
-        }
-    ]
+    """
+    Get patient summaries derived from real PATIENT role cases in the system.
+    Returns structured summaries grouped by user_id.
+    """
+    patient_cases = await Case.find(Case.role == "PATIENT").to_list()
+    if not patient_cases:
+        return []
+
+    # Group by user_id
+    patient_map: Dict[str, Dict[str, Any]] = {}
+    for case in patient_cases:
+        uid = case.user_id
+        if uid not in patient_map:
+            patient_map[uid] = {
+                "patient_id": uid,
+                "cases": [],
+                "recent_flags": [],
+            }
+        patient_map[uid]["cases"].append({
+            "case_id": case.case_id,
+            "title": case.title,
+            "risk_level": case.risk_level,
+            "status": case.status.value if hasattr(case.status, "value") else case.status,
+        })
+        if case.risk_level in ("HIGH", "CRITICAL"):
+            patient_map[uid]["recent_flags"].append(
+                f"High-risk case: {case.title}"
+            )
+
+    return list(patient_map.values())
 
 @router.get("/adr-reviews", response_model=List[ADRReport])
 async def get_adr_reviews(current_user: User = Depends(get_current_doctor)) -> Any:
@@ -51,7 +71,7 @@ async def get_adr_reviews(current_user: User = Depends(get_current_doctor)) -> A
     return await ADRReport.find(ADRReport.status == "NEEDS_DOCTOR_REVIEW").to_list()
 
 class ADRActionReq(BaseModel):
-    action: str # e.g., 'CONFIRMED_ADR', 'DISMISSED'
+    action: str  # e.g., 'CONFIRMED_ADR', 'POSSIBLE_ADR', 'DISMISSED', 'URGENT_CARE'
     notes: str
 
 @router.patch("/adr-review/{adr_id}")
@@ -60,10 +80,14 @@ async def review_adr(adr_id: str, req: ADRActionReq, current_user: User = Depend
     adr = await ADRReport.find_one(ADRReport.adr_id == adr_id)
     if not adr:
         raise HTTPException(status_code=404, detail="ADR Report not found")
-        
+
+    valid_actions = {"CONFIRMED_ADR", "POSSIBLE_ADR", "DISMISSED", "URGENT_CARE"}
+    if req.action not in valid_actions:
+        raise HTTPException(status_code=400, detail=f"Invalid action. Must be one of: {valid_actions}")
+
     adr.status = "REVIEWED"
     await adr.save()
-    
+
     review = DoctorReview(
         case_id=adr.case_id,
         doctor_id=current_user.user_id,
@@ -71,21 +95,110 @@ async def review_adr(adr_id: str, req: ADRActionReq, current_user: User = Depend
         notes=req.notes
     )
     await review.insert()
+    await record_audit_log(current_user.user_id, "DOCTOR", "DOCTOR_ADR_REVIEW", "adr_report",
+                           metadata={"adr_id": adr_id, "action": req.action})
     return adr
 
 class EPrescriptionReq(BaseModel):
     patient_name: str
+    patient_id: Optional[str] = None
     medicines: List[str]
     notes: str
 
 @router.post("/prescription-verification")
 async def generate_eprescription(req: EPrescriptionReq, current_user: User = Depends(get_current_doctor)) -> Any:
-    """Generate a verified e-prescription scaffold to prevent misuse."""
-    verification_id = f"RX-VERIFY-{str(uuid.uuid4())[:8].upper()}"
+    """Generate and persist a verified e-prescription to prevent misuse."""
+    from datetime import timedelta
+    vp = VerifiedPrescription(
+        doctor_id=current_user.user_id,
+        patient_name=req.patient_name,
+        patient_id=req.patient_id,
+        medicine_list=req.medicines,
+        notes=req.notes,
+        status="ACTIVE",
+        expires_at=datetime.now(timezone.utc) + timedelta(days=30),
+    )
+    await vp.insert()
+    await record_audit_log(current_user.user_id, "DOCTOR", "DOCTOR_PRESCRIPTION_VERIFIED", "verified_prescription",
+                           metadata={"verification_id": vp.verification_id, "patient": req.patient_name})
     return {
-        "verification_id": verification_id,
+        "verification_id": vp.verification_id,
         "doctor_name": current_user.name,
-        "patient": req.patient_name,
-        "medicines": req.medicines,
-        "status": "VERIFIED_ACTIVE"
+        "patient": vp.patient_name,
+        "medicines": vp.medicine_list,
+        "status": vp.status,
+        "expires_at": vp.expires_at.isoformat() if vp.expires_at else None,
+    }
+
+# ─── Doctor-Pharmacist Messaging ─────────────────────────────────────────────
+
+class MessageReplyReq(BaseModel):
+    message: str
+
+@router.get("/messages", response_model=List[DoctorPharmacistMessage])
+async def get_messages(current_user: User = Depends(get_current_doctor)) -> Any:
+    """Get pharmacist questions addressed to this doctor."""
+    return await DoctorPharmacistMessage.find(
+        DoctorPharmacistMessage.receiver_id == current_user.user_id
+    ).to_list()
+
+@router.post("/messages/{message_id}/reply")
+async def reply_to_message(
+    message_id: str,
+    req: MessageReplyReq,
+    current_user: User = Depends(get_current_doctor)
+) -> Any:
+    """Reply to a pharmacist question."""
+    original = await DoctorPharmacistMessage.find_one(
+        DoctorPharmacistMessage.message_id == message_id
+    )
+    if not original:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    reply = DoctorPharmacistMessage(
+        case_id=original.case_id,
+        sender_id=current_user.user_id,
+        sender_role="DOCTOR",
+        receiver_id=original.sender_id,
+        message=req.message,
+    )
+    await reply.insert()
+    await record_audit_log(current_user.user_id, "DOCTOR", "DOCTOR_PHARMACIST_REPLY", "message",
+                           metadata={"original_message_id": message_id})
+    return {"status": "sent", "reply_id": reply.message_id}
+
+# ─── Substitution Decision ────────────────────────────────────────────────────
+
+class SubstitutionDecisionReq(BaseModel):
+    case_id: str
+    prescribed_medicine: str
+    proposed_substitution: str
+    decision: str  # APPROVED | REJECTED | NEEDS_MONITORING
+    reason: str
+
+@router.post("/substitution-decision")
+async def substitution_decision(
+    req: SubstitutionDecisionReq,
+    current_user: User = Depends(get_current_doctor)
+) -> Any:
+    """Doctor approves or rejects a pharmacist-proposed substitution."""
+    valid_decisions = {"APPROVED", "REJECTED", "NEEDS_MONITORING"}
+    if req.decision not in valid_decisions:
+        raise HTTPException(status_code=400, detail=f"Decision must be one of: {valid_decisions}")
+
+    review = DoctorReview(
+        case_id=req.case_id,
+        doctor_id=current_user.user_id,
+        action_taken=f"SUBSTITUTION_{req.decision}",
+        notes=f"Prescribed: {req.prescribed_medicine} → Proposed: {req.proposed_substitution}. Reason: {req.reason}",
+    )
+    await review.insert()
+    await record_audit_log(current_user.user_id, "DOCTOR", "DOCTOR_SUBSTITUTION_DECISION", "substitution",
+                           metadata={"case_id": req.case_id, "decision": req.decision})
+    return {
+        "status": "recorded",
+        "decision": req.decision,
+        "prescribed": req.prescribed_medicine,
+        "proposed": req.proposed_substitution,
+        "reason": req.reason,
     }

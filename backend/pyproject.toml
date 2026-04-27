@@ -43,6 +43,9 @@ include = ["app*"]
 pythonpath = ["."]
 testpaths = ["app/tests"]
 asyncio_mode = "auto"
+markers = [
+    "integration: mark test as requiring a live MongoDB connection (deselect with '-m \"not integration\"')",
+]
 
 [tool.ruff]
 line-length = 100

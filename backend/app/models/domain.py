@@ -328,3 +328,16 @@ class VerifiedPrescription(Document):
 
     class Settings:
         name = "verified_prescriptions"
+
+class DataSourceSyncStatus(Document):
+    """Tracks the sync state of external data adapters (NPPA, NSQ, Jan Aushadhi, etc.)."""
+    source_name: Indexed(str)  # e.g. "NSQ_SPURIOUS", "NPPA_PRICE", "JAN_AUSHADHI"
+    status: str = "MOCK_MODE"  # CONNECTED | MOCK_MODE | FAILED | NOT_CONNECTED
+    last_synced: Optional[datetime] = None
+    records_loaded: Optional[int] = None
+    error_message: Optional[str] = None
+    note: Optional[str] = None
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    class Settings:
+        name = "data_source_sync_status"
