@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from app.models.domain import Case, RoleEnum, UserDocument, AgentRun
+from app.models.domain import Case, RoleEnum, UserDocument, AgentRun, User
+from app.api.deps import get_current_active_user
 from app.schemas.case import CaseCreateRequest, CaseRecordResponse, CaseAnalyzeResponse, DocumentUploadResponse
 from app.services.agents.patient_agent import PatientAgent
 from app.services.agents.pharmacist_agent import PharmacistAgent
@@ -30,27 +31,35 @@ router = APIRouter(prefix="/api/cases", tags=["cases"])
 
 
 @router.post("", response_model=CaseRecordResponse)
-async def create_case(request: CaseCreateRequest) -> CaseRecordResponse:
+async def create_case(
+    request: CaseCreateRequest,
+    current_user: User = Depends(get_current_active_user)
+) -> CaseRecordResponse:
     new_case = Case(
-        user_id="mock_user_123",
+        user_id=current_user.user_id,
         role=request.role,
         case_type=request.case_type,
         title=request.title,
         query=request.query
     )
     await new_case.insert()
-    await record_audit_log("mock_user_123", request.role.value, "CREATE_CASE", "case", case_id=new_case.case_id)
+    await record_audit_log(current_user.user_id, request.role.value, "CREATE_CASE", "case", case_id=new_case.case_id)
     return CaseRecordResponse.model_validate(new_case.model_dump())
 
 
 @router.get("", response_model=List[CaseRecordResponse])
-async def list_cases() -> List[CaseRecordResponse]:
-    cases = await Case.find_all().to_list()
+async def list_cases(current_user: User = Depends(get_current_active_user)) -> List[CaseRecordResponse]:
+    # In production, we'd filter cases by role, e.g., if patient, only show their cases. 
+    # If admin, show all. For MVP, we filter if they are patient, doctor or pharmacist, but admin sees all.
+    query = {}
+    if current_user.role != RoleEnum.ADMIN:
+        query["user_id"] = current_user.user_id
+    cases = await Case.find(query).to_list()
     return [CaseRecordResponse.model_validate(c.model_dump()) for c in cases]
 
 
 @router.get("/{case_id}", response_model=CaseRecordResponse)
-async def get_case(case_id: str) -> CaseRecordResponse:
+async def get_case(case_id: str, current_user: User = Depends(get_current_active_user)) -> CaseRecordResponse:
     case = await Case.find_one(Case.case_id == case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
@@ -63,7 +72,7 @@ class SearchRequest(BaseModel):
 
 
 @router.post("/{case_id}/search")
-async def search_documents(case_id: str, request: SearchRequest):
+async def search_documents(case_id: str, request: SearchRequest, current_user: User = Depends(get_current_active_user)):
     target_case = await Case.find_one(Case.case_id == case_id)
     if not target_case:
         raise HTTPException(status_code=404, detail="Case not found")
@@ -79,7 +88,7 @@ class AnalyzeRequest(BaseModel):
 
 
 @router.post("/{case_id}/analyze")
-async def analyze_case(case_id: str, request: Optional[AnalyzeRequest] = None) -> Dict[str, Any]:
+async def analyze_case(case_id: str, request: Optional[AnalyzeRequest] = None, current_user: User = Depends(get_current_active_user)) -> Dict[str, Any]:
     target_case = await Case.find_one(Case.case_id == case_id)
     if not target_case:
         raise HTTPException(status_code=404, detail="Case not found")

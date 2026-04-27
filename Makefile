@@ -8,11 +8,6 @@ up:
 down:
 	$(COMPOSE) down
 
-seed:
-	$(COMPOSE) exec backend python -m app.scripts.seed_demo_data
-
-public-ingest:
-	$(COMPOSE) exec backend python -m app.scripts.ingest_public_sources
 
 test:
 	$(COMPOSE) run --rm backend pytest app/tests -q

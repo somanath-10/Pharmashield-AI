@@ -13,6 +13,15 @@ from app.models.domain import (
     AgentRun,
     Feedback,
     Citation,
+    PrescriptionExtraction,
+    SellerRiskAssessment,
+    BatchVerification,
+    PriceComplianceCheck,
+    SubstitutionCheck,
+    ADRReport,
+    PharmacistReview,
+    DoctorReview,
+    DoctorPharmacistMessage
 )
 from app.services.memory.memory_store import MemoryEntry
 
@@ -23,11 +32,11 @@ async def init_db() -> None:
     settings = get_settings()
     logger.info("Connecting to MongoDB for PharmaShield India (Role-Based MVP)...")
 
-    client = AsyncIOMotorClient(settings.database_url)
+    client = AsyncIOMotorClient(settings.mongo_uri)
 
     # Parse DB name from the URL (path segment before query string)
-    db_path = settings.database_url.split("/")
-    db_name = db_path[-1].split("?")[0] if db_path else "pharmashield_india"
+    db_path = settings.mongo_uri.split("/")
+    db_name = db_path[-1].split("?")[0] if db_path else "pharmashield_db"
 
     await init_beanie(
         database=client[db_name],
@@ -42,6 +51,15 @@ async def init_db() -> None:
             Feedback,
             Citation,
             MemoryEntry,
+            PrescriptionExtraction,
+            SellerRiskAssessment,
+            BatchVerification,
+            PriceComplianceCheck,
+            SubstitutionCheck,
+            ADRReport,
+            PharmacistReview,
+            DoctorReview,
+            DoctorPharmacistMessage
         ],
     )
     logger.info("MongoDB and Beanie ODM initialized successfully.")

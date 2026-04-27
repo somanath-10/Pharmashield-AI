@@ -174,3 +174,14 @@ class AuditLog(Base):
     entity_id = Column(String, nullable=True)
     metadata_json = Column(JSON, default=dict)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class DataSourceSyncStatus(Base):
+    __tablename__ = "data_source_sync_status"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    source_name = Column(String, index=True) # e.g. "CDSCO_NSQ", "NPPA", "PMBJP"
+    status = Column(String) # CONNECTED, MOCK_MODE, FAILED
+    last_synced_at = Column(DateTime, nullable=True)
+    error_message = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

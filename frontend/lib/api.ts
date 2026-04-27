@@ -4,13 +4,26 @@
 
 const API = "";  // Empty string = same origin, proxied by next.config.js rewrites
 
+function getAuthToken() {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(/(^| )access_token=([^;]+)/);
+  return match ? match[2] : null;
+}
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> ?? {}),
+  };
+  
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${API}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    headers,
     cache: "no-store",
   });
   if (!res.ok) {
@@ -61,7 +74,19 @@ export async function uploadDocument(caseId: string, file: File): Promise<{
 }> {
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch(`/api/cases/${caseId}/documents`, { method: "POST", body: formData, cache: "no-store" });
+  
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`/api/cases/${caseId}/documents`, { 
+    method: "POST", 
+    body: formData, 
+    headers,
+    cache: "no-store" 
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -113,7 +138,112 @@ export async function analyzeCase(
 }
 
 // ─── Intelligence ─────────────────────────────────────────────────────────────
+// --- Patient Phase 2 & 7 Endpoints ---
 
+export interface PatientDashboard {
+  active_cases: number;
+  adr_reports: number;
+  adherence_status: string;
+}
+
+export async function getPatientDashboard(): Promise<PatientDashboard> {
+  return req<PatientDashboard>('/api/patient/dashboard');
+}
+
+export async function getPatientCases(): Promise<any[]> {
+  return req<any[]>('/api/patient/cases');
+}
+
+export async function reportSideEffect(data: {
+  case_id: string;
+  medicine_name: string;
+  batch_number?: string;
+  reaction: string;
+  severity: string;
+  timeline: string;
+  patient_age_range?: string;
+}): Promise<any> {
+  return req<any>('/api/patient/side-effect-report', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getAffordability(caseId: string): Promise<any> {
+  return req<any>(`/api/patient/affordability/${caseId}`);
+}
+
+// --- Pharmacist Phase 2 & 7 Endpoints ---
+
+export async function getPharmacistDashboard(): Promise<any> {
+  return req<any>('/api/pharmacist/dashboard');
+}
+
+export async function getPharmacistReviewQueue(): Promise<any[]> {
+  return req<any[]>('/api/pharmacist/review-queue');
+}
+
+export async function performBatchCheck(data: {
+  case_id: string; medicine_name: string; batch_number: string;
+  expiry_date?: string; manufacturer?: string; supplier?: string;
+}): Promise<any> {
+  return req<any>('/api/pharmacist/batch-check', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function performPriceCheck(data: {
+  case_id: string; medicine_name: string; mrp: number; charged_price: number;
+}): Promise<any> {
+  return req<any>('/api/pharmacist/price-check', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function performSubstitutionCheck(data: {
+  case_id: string; prescribed_medicine: string; substituted_medicine: string;
+}): Promise<any> {
+  return req<any>('/api/pharmacist/substitution-check', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function createPharmacistADRDraft(data: {
+  case_id: string; medicine_name: string; reaction: string; severity: string; timeline: string;
+  patient_age_range?: string; batch_number?: string;
+}): Promise<any> {
+  return req<any>('/api/pharmacist/adr-draft', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function submitPharmacistReview(caseId: string, data: { action_taken: string; notes: string; }): Promise<any> {
+  return req<any>(`/api/pharmacist/reviews/${caseId}`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+
+// --- Doctor Phase 2 & 7 Endpoints ---
+
+export async function getDoctorDashboard(): Promise<any> {
+  return req<any>('/api/doctor/dashboard');
+}
+
+export async function getDoctorPatients(): Promise<any[]> {
+  return req<any[]>('/api/doctor/patients');
+}
+
+export async function getDoctorADRReviews(): Promise<any[]> {
+  return req<any[]>('/api/doctor/adr-reviews');
+}
+
+export async function reviewDoctorADR(adrId: string, data: { action: string; notes: string }): Promise<any> {
+  return req<any>(`/api/doctor/adr-review/${adrId}`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+
+export async function generateDoctorPrescription(data: { patient_name: string; medicines: string[]; notes: string }): Promise<any> {
+  return req<any>('/api/doctor/prescription-verification', { method: 'POST', body: JSON.stringify(data) });
+}
+
+// --- Admin Phase 2 & 7 Endpoints ---
+
+export async function getAdminAnalytics(): Promise<any> {
+  return req<any>('/api/admin/analytics');
+}
+
+export async function getAdminAuditLogs(limit: number = 50): Promise<any> {
+  return req<any>(`/api/admin/audit-logs?limit=${limit}`);
+}
 export async function checkPrice(payload: {
   drug_name: string;
   composition?: string;

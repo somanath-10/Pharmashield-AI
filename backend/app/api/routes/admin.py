@@ -4,8 +4,9 @@ Admin Analytics Route — aggregated case and risk analytics for the admin dashb
 from __future__ import annotations
 import logging
 from typing import Any, Dict
-from fastapi import APIRouter
-from app.models.domain import Case, Feedback, AgentRun
+from fastapi import APIRouter, Depends
+from app.models.domain import Case, Feedback, AgentRun, User
+from app.api.deps import get_current_admin
 from app.services.audit import get_audit_logs
 
 logger = logging.getLogger(__name__)
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
 @router.get("/analytics")
-async def get_analytics() -> Dict[str, Any]:
+async def get_analytics(current_user: User = Depends(get_current_admin)) -> Dict[str, Any]:
     """Aggregated analytics for admin dashboard."""
     all_cases = await Case.find_all().to_list()
     total = len(all_cases)
@@ -63,6 +64,6 @@ async def get_analytics() -> Dict[str, Any]:
 
 
 @router.get("/audit-logs")
-async def get_audit_log_entries(limit: int = 50) -> Dict[str, Any]:
+async def get_audit_log_entries(limit: int = 50, current_user: User = Depends(get_current_admin)) -> Dict[str, Any]:
     logs = await get_audit_logs(limit=limit)
     return {"count": len(logs), "logs": logs}

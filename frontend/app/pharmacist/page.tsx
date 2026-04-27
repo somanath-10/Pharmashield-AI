@@ -92,9 +92,14 @@ export default function PharmacistDashboard() {
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Check dispensing compliance, NSQ alerts, stock, seller risk, and NPPA pricing.</p>
         </div>
-        <Link href="/login" style={{ textDecoration: 'none' }}>
-          <button className="btn-primary btn-sm" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}>← Change Role</button>
-        </Link>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <Link href="/pharmacist/queue" style={{ textDecoration: 'none' }}>
+            <button className="btn-primary btn-sm" style={{ background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)' }}>📋 View Queue</button>
+          </Link>
+          <Link href="/login" style={{ textDecoration: 'none' }}>
+            <button className="btn-primary btn-sm" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}>← Change Role</button>
+          </Link>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: '24px' }}>

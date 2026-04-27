@@ -37,3 +37,15 @@ async def get_current_active_user(
 ) -> User:
     # In a real app we might check if user is active here
     return current_user
+
+def require_role(role: str):
+    async def role_checker(current_user: Annotated[User, Depends(get_current_active_user)]) -> User:
+        if current_user.role != role:
+            raise HTTPException(status_code=403, detail="Not enough permissions")
+        return current_user
+    return role_checker
+
+get_current_patient = require_role("PATIENT")
+get_current_pharmacist = require_role("PHARMACIST")
+get_current_doctor = require_role("DOCTOR")
+get_current_admin = require_role("ADMIN")

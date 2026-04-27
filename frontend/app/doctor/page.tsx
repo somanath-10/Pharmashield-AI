@@ -80,9 +80,14 @@ export default function DoctorDashboard() {
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Review summarized patient case highlights, pharmacist flags, and clinical follow-up points.</p>
         </div>
-        <Link href="/login" style={{ textDecoration: 'none' }}>
-          <button className="btn-primary btn-sm" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}>← Change Role</button>
-        </Link>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <Link href="/doctor/patients" style={{ textDecoration: 'none' }}>
+            <button className="btn-primary btn-sm" style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)' }}>👥 View Patients</button>
+          </Link>
+          <Link href="/login" style={{ textDecoration: 'none' }}>
+            <button className="btn-primary btn-sm" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}>← Change Role</button>
+          </Link>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '20px' }}>

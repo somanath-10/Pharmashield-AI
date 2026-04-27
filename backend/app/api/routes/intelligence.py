@@ -4,9 +4,11 @@ Intelligence Routes — direct query endpoints for pharmacy intelligence checks.
 from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from app.models.domain import User
+from app.api.deps import get_current_active_user
 from app.services.agents.price_agent import PriceJanAushadhiAgent
 from app.services.agents.compliance_agent import PrescriptionComplianceAgent
 from app.services.agents.nsq_agent import NSQSuriousAgent
@@ -79,7 +81,7 @@ class JanAushadhiSearchRequest(BaseModel):
 
 
 @router.post("/price-check")
-async def price_check(req: PriceCheckRequest) -> Dict[str, Any]:
+async def price_check(req: PriceCheckRequest, current_user: User = Depends(get_current_active_user)) -> Dict[str, Any]:
     agent = PriceJanAushadhiAgent()
     result = await agent.run(req.drug_name, req.composition, req.mrp, req.patient_budget_sensitive)
     await record_audit_log(req.user_id, "API", "PRICE_CHECK", "intelligence", metadata={"drug": req.drug_name})
@@ -87,7 +89,7 @@ async def price_check(req: PriceCheckRequest) -> Dict[str, Any]:
 
 
 @router.post("/janaushadhi-search")
-async def janaushadhi_search(req: JanAushadhiSearchRequest) -> Dict[str, Any]:
+async def janaushadhi_search(req: JanAushadhiSearchRequest, current_user: User = Depends(get_current_active_user)) -> Dict[str, Any]:
     agent = PriceJanAushadhiAgent()
     result = await agent.run(req.drug_name, req.composition, patient_budget_sensitive=True)
     await record_audit_log(req.user_id, "API", "JANAUSHADHI_SEARCH", "intelligence", metadata={"drug": req.drug_name})
@@ -95,7 +97,7 @@ async def janaushadhi_search(req: JanAushadhiSearchRequest) -> Dict[str, Any]:
 
 
 @router.post("/nsq-check")
-async def nsq_check(req: NSQCheckRequest) -> Dict[str, Any]:
+async def nsq_check(req: NSQCheckRequest, current_user: User = Depends(get_current_active_user)) -> Dict[str, Any]:
     agent = NSQSuriousAgent()
     result = await agent.run(req.drug_name, req.brand_name, req.manufacturer, req.batch_number, req.composition)
     await record_audit_log(req.user_id, "API", "NSQ_CHECK", "intelligence", metadata={"drug": req.drug_name, "batch": req.batch_number})
@@ -103,7 +105,7 @@ async def nsq_check(req: NSQCheckRequest) -> Dict[str, Any]:
 
 
 @router.post("/schedule-check")
-async def schedule_check(req: ScheduleCheckRequest) -> Dict[str, Any]:
+async def schedule_check(req: ScheduleCheckRequest, current_user: User = Depends(get_current_active_user)) -> Dict[str, Any]:
     agent = PrescriptionComplianceAgent()
     result = await agent.run(req.medicine_name, req.composition, req.prescription_available, req.claim_text)
     await record_audit_log(req.user_id, "API", "SCHEDULE_CHECK", "intelligence", metadata={"medicine": req.medicine_name})
@@ -111,7 +113,7 @@ async def schedule_check(req: ScheduleCheckRequest) -> Dict[str, Any]:
 
 
 @router.post("/scheme-check")
-async def scheme_check(req: SchemeCheckRequest) -> Dict[str, Any]:
+async def scheme_check(req: SchemeCheckRequest, current_user: User = Depends(get_current_active_user)) -> Dict[str, Any]:
     agent = SchemeClaimAgent()
     result = await agent.run(req.scheme_name, req.hospitalized, req.purchase_context)
     await record_audit_log(req.user_id, "API", "SCHEME_CHECK", "intelligence")
@@ -119,7 +121,7 @@ async def scheme_check(req: SchemeCheckRequest) -> Dict[str, Any]:
 
 
 @router.post("/seller-risk-check")
-async def seller_risk_check(req: SellerRiskCheckRequest) -> Dict[str, Any]:
+async def seller_risk_check(req: SellerRiskCheckRequest, current_user: User = Depends(get_current_active_user)) -> Dict[str, Any]:
     agent = OnlineSellerRiskAgent()
     result = await agent.run(req.seller_name, req.seller_type, req.claim_text, req.license_number, req.batch_number, req.manufacturer, req.mrp)
     await record_audit_log(req.user_id, "API", "SELLER_RISK_CHECK", "intelligence", metadata={"seller": req.seller_name})
@@ -127,7 +129,7 @@ async def seller_risk_check(req: SellerRiskCheckRequest) -> Dict[str, Any]:
 
 
 @router.post("/inventory-check")
-async def inventory_check(req: InventoryCheckRequest) -> Dict[str, Any]:
+async def inventory_check(req: InventoryCheckRequest, current_user: User = Depends(get_current_active_user)) -> Dict[str, Any]:
     agent = InventoryBatchAgent()
     result = await agent.run(req.drug_name, req.quantity_on_hand, req.batch_number, req.supplier_name, req.location_id)
     await record_audit_log(req.user_id, "API", "INVENTORY_CHECK", "intelligence", metadata={"drug": req.drug_name})

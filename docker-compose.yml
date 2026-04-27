@@ -9,6 +9,18 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+  
+  mongodb:
+    image: mongo:6.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: pharmashield
+      MONGO_INITDB_ROOT_PASSWORD: pharmashield_password
+      MONGO_INITDB_DATABASE: pharmashield_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
   backend:
     build:
       context: ./backend
@@ -18,12 +30,16 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       POSTGRES_URL: ${POSTGRES_URL:-postgresql+asyncpg://pharmashield:pharmashield_password@postgres:5432/pharmashield_db}
+      MONGO_URI: ${MONGO_URI:-mongodb://pharmashield:pharmashield_password@mongodb:27017/pharmashield_db?authSource=admin}
       APP_ENV: ${APP_ENV}
       CORS_ORIGINS: ${CORS_ORIGINS}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "${BACKEND_PORT}:8000"
+    depends_on:
+      - postgres
+      - mongodb
 
   frontend:
     build:
@@ -38,3 +54,4 @@ services:
 
 volumes:
   postgres_data:
+  mongodb_data:

@@ -4,10 +4,12 @@ Ingest Routes — POST endpoints to load India pharmacy intelligence data.
 from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from app.db.postgres import async_session_maker
 from app.models.postgres_models import NSQAlert, PriceRecord, JanAushadhiProduct, DrugScheduleRule, SchemeRule, InventoryItem, Supplier
+from app.models.domain import User
+from app.api.deps import get_current_admin
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ingest", tags=["ingest"])
@@ -85,7 +87,7 @@ class SupplierIn(BaseModel):
 
 
 @router.post("/cdsco-nsq")
-async def ingest_nsq_alert(data: NSQAlertIn) -> Dict[str, Any]:
+async def ingest_nsq_alert(data: NSQAlertIn, current_user: User = Depends(get_current_admin)) -> Dict[str, Any]:
     async with async_session_maker() as session:
         alert = NSQAlert(**data.model_dump(exclude={"risk_reasons"}))
         session.add(alert)
@@ -94,7 +96,7 @@ async def ingest_nsq_alert(data: NSQAlertIn) -> Dict[str, Any]:
 
 
 @router.post("/nppa-prices")
-async def ingest_price_record(data: PriceRecordIn) -> Dict[str, Any]:
+async def ingest_price_record(data: PriceRecordIn, current_user: User = Depends(get_current_admin)) -> Dict[str, Any]:
     async with async_session_maker() as session:
         record = PriceRecord(**data.model_dump())
         session.add(record)
@@ -103,7 +105,7 @@ async def ingest_price_record(data: PriceRecordIn) -> Dict[str, Any]:
 
 
 @router.post("/janaushadhi-products")
-async def ingest_jan_aushadhi(data: JanAushadhiIn) -> Dict[str, Any]:
+async def ingest_jan_aushadhi(data: JanAushadhiIn, current_user: User = Depends(get_current_admin)) -> Dict[str, Any]:
     async with async_session_maker() as session:
         product = JanAushadhiProduct(**data.model_dump())
         session.add(product)
@@ -112,7 +114,7 @@ async def ingest_jan_aushadhi(data: JanAushadhiIn) -> Dict[str, Any]:
 
 
 @router.post("/schedule-rules")
-async def ingest_schedule_rule(data: ScheduleRuleIn) -> Dict[str, Any]:
+async def ingest_schedule_rule(data: ScheduleRuleIn, current_user: User = Depends(get_current_admin)) -> Dict[str, Any]:
     async with async_session_maker() as session:
         rule = DrugScheduleRule(**data.model_dump())
         session.add(rule)
@@ -121,7 +123,7 @@ async def ingest_schedule_rule(data: ScheduleRuleIn) -> Dict[str, Any]:
 
 
 @router.post("/scheme-rules")
-async def ingest_scheme_rule(data: SchemeRuleIn) -> Dict[str, Any]:
+async def ingest_scheme_rule(data: SchemeRuleIn, current_user: User = Depends(get_current_admin)) -> Dict[str, Any]:
     async with async_session_maker() as session:
         rule = SchemeRule(**data.model_dump())
         session.add(rule)
@@ -130,7 +132,7 @@ async def ingest_scheme_rule(data: SchemeRuleIn) -> Dict[str, Any]:
 
 
 @router.post("/suppliers")
-async def ingest_supplier(data: SupplierIn) -> Dict[str, Any]:
+async def ingest_supplier(data: SupplierIn, current_user: User = Depends(get_current_admin)) -> Dict[str, Any]:
     async with async_session_maker() as session:
         supplier = Supplier(
             supplier_name=data.supplier_name,
