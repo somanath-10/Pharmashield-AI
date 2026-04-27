@@ -12,18 +12,32 @@ export default function MedicineSafetyPage() {
   const [result, setResult] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState('');
+  const [error, setError] = useState('');
 
   const handleAnalyze = async () => {
     if (!file) return;
-    setLoading(true); setStep('Initializing check...');
+    setLoading(true); setStep('Initializing check...'); setError('');
     try {
       const { case_id } = await createCase({ role: 'PATIENT', case_type: 'PATIENT_PRESCRIPTION_EXPLANATION', title: 'Medicine Safety Check', query: 'Check medicine safety' });
       setStep('Uploading...');
-      await uploadDocument(case_id, file);
+      const uploadRes = await uploadDocument(case_id, file);
+      
+      if (uploadRes.status === 'OCR_PENDING') {
+        setResult({
+          risk_level: 'UNKNOWN',
+          answer: {
+            simple_summary: uploadRes.message
+          }
+        });
+        setLoading(false); setStep('');
+        return;
+      }
+
       setStep('Running safety analysis...');
       const res = await analyzeCase(case_id, 'Check medicine safety and seller risk', { seller_type: sellerType });
       setResult(res);
-    } catch (e) {
+    } catch (e: any) {
+      setError(e?.message || 'Failed to analyze safety. Please check your connection.');
       console.error(e);
     }
     setLoading(false); setStep('');
@@ -51,6 +65,12 @@ export default function MedicineSafetyPage() {
         <button className={`btn-primary ${loading ? 'btn-disabled' : ''}`} onClick={handleAnalyze} disabled={loading || !file} style={{ width: '100%', justifyContent: 'center' }}>
           {loading ? step : 'Analyze Safety'}
         </button>
+
+        {error && (
+          <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', borderRadius: '8px', fontSize: '0.9rem' }}>
+            ❌ {error}
+          </div>
+        )}
       </div>
 
       {result && (

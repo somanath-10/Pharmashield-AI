@@ -43,6 +43,21 @@ def _register_and_login(email: str, role: str, password: str = "Secure@123") -> 
     assert resp.status_code == 200, f"Login failed for {email}: {resp.text}"
     return resp.json()["access_token"]
 
+def _create_case(token: str, role: str = "PATIENT") -> str:
+    """Create a case and return case_id."""
+    resp = client.post(
+        "/api/cases",
+        json={
+            "role": role,
+            "case_type": "PATIENT_PRESCRIPTION_EXPLANATION",
+            "title": "Test Case",
+            "query": "Test query"
+        },
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 200
+    return resp.json()["case_id"]
+
 # ═════════════════════════════════════════════════════════════════════════════
 # UNIT TESTS — Always run, no DB required
 # ═════════════════════════════════════════════════════════════════════════════
@@ -164,7 +179,7 @@ def test_pharmacist_dispensing_statuses():
 def test_pharmacist_batch_check_clean():
     token = _register_and_login("pharm_batch@pharmashield.in", "PHARMACIST")
     resp = client.post("/api/pharmacist/batch-check",
-        json={"case_id": "tc-001", "medicine_name": "Paracetamol", "batch_number": "PCT2026A"},
+        json={"medicine_name": "Paracetamol", "batch_number": "PCT2026A"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200
@@ -176,7 +191,7 @@ def test_pharmacist_batch_check_clean():
 def test_pharmacist_batch_check_spurious():
     token = _register_and_login("pharm_batch2@pharmashield.in", "PHARMACIST")
     resp = client.post("/api/pharmacist/batch-check",
-        json={"case_id": "tc-002", "medicine_name": "Paracetamol", "batch_number": "FAKE2026X"},
+        json={"medicine_name": "Paracetamol", "batch_number": "FAKE2026X"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200
@@ -188,7 +203,7 @@ def test_pharmacist_batch_check_spurious():
 def test_pharmacist_price_check_overcharged():
     token = _register_and_login("pharm_price@pharmashield.in", "PHARMACIST")
     resp = client.post("/api/pharmacist/price-check",
-        json={"case_id": "tc-003", "medicine_name": "Azithromycin", "mrp": 150.0, "charged_price": 200.0},
+        json={"medicine_name": "Azithromycin", "mrp": 150.0, "charged_price": 200.0},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200
@@ -207,9 +222,12 @@ def test_pharmacist_dispensing_decision_invalid_status():
 @skip_if_no_db
 @pytest.mark.integration
 def test_pharmacist_dispensing_decision_valid():
+    p_token = _register_and_login("patient_for_dd@pharmashield.in", "PATIENT")
+    case_id = _create_case(p_token)
+    
     token = _register_and_login("pharm_dd2@pharmashield.in", "PHARMACIST")
     resp = client.post("/api/pharmacist/dispensing-decision",
-        json={"case_id": "tc-005", "medicine_name": "Paracetamol", "dispensing_status": "CAN_DISPENSE"},
+        json={"case_id": case_id, "medicine_name": "Paracetamol", "dispensing_status": "CAN_DISPENSE"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200
@@ -251,10 +269,13 @@ def test_doctor_prescription_verification_saves():
 @skip_if_no_db
 @pytest.mark.integration
 def test_doctor_substitution_decision_approved():
+    p_token = _register_and_login("patient_for_sub@pharmashield.in", "PATIENT")
+    case_id = _create_case(p_token)
+
     token = _register_and_login("doc_sub@pharmashield.in", "DOCTOR")
     resp = client.post("/api/doctor/substitution-decision",
         json={
-            "case_id": "tc-sub-001",
+            "case_id": case_id,
             "prescribed_medicine": "Atorvastatin 10mg",
             "proposed_substitution": "Rosuvastatin 10mg",
             "decision": "APPROVED",

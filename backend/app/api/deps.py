@@ -9,7 +9,7 @@ from app.models.domain import User
 
 settings = get_settings()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_prefix}/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> User:
     credentials_exception = HTTPException(

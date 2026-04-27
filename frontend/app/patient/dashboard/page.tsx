@@ -95,7 +95,11 @@ export default function PatientDashboardPage() {
                   {cases.map((c: any) => (
                     <tr key={c.case_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <td style={{ padding: '12px 8px' }}>{new Date(c.created_at).toLocaleDateString()}</td>
-                      <td style={{ padding: '12px 8px', fontWeight: 600 }}>{c.title}</td>
+                      <td style={{ padding: '12px 8px', fontWeight: 600 }}>
+                        <Link href={`/patient/cases/${c.case_id}`} style={{ color: '#60a5fa', textDecoration: 'none' }}>
+                          {c.title}
+                        </Link>
+                      </td>
                       <td style={{ padding: '12px 8px', color: 'var(--text-secondary)' }}>{c.case_type}</td>
                       <td style={{ padding: '12px 8px' }}>
                          <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>{c.status}</span>

@@ -13,12 +13,17 @@ const SEV_COLORS: Record<string, string> = {
 
 export default function AdminADRMonitoringPage() {
   const [adrs, setAdrs] = useState<any[]>([]);
+  const [summary, setSummary] = useState<{ total_adr_drafts?: number; pending_doctor_review?: number; submitted_externally?: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     (async () => {
-      try { setAdrs(await getAdminADRMonitoring()); }
+      try {
+        const data = await getAdminADRMonitoring();
+        setSummary(data.summary || null);
+        setAdrs(data.reports || []);
+      }
       catch (e: any) { setError(e?.message || 'Failed to load ADR reports'); }
       setLoading(false);
     })();
@@ -38,7 +43,23 @@ export default function AdminADRMonitoringPage() {
         <div className="glass-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading…</div>
       ) : error ? (
         <div className="glass-card" style={{ padding: '24px', color: '#f87171' }}>❌ {error}</div>
-      ) : adrs.length === 0 ? (
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+            <div className="glass-card" style={{ padding: '16px', textAlign: 'center' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{summary?.total_adr_drafts ?? 0}</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Total Drafts</div>
+            </div>
+            <div className="glass-card" style={{ padding: '16px', textAlign: 'center' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{summary?.pending_doctor_review ?? 0}</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Pending Doctor Review</div>
+            </div>
+            <div className="glass-card" style={{ padding: '16px', textAlign: 'center' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{summary?.submitted_externally ?? 0}</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Submitted Externally</div>
+            </div>
+          </div>
+          {adrs.length === 0 ? (
         <div className="glass-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
           <h3>No ADR Reports</h3>
           <p style={{ marginTop: '12px' }}>ADR reports submitted by pharmacists and patients will appear here.</p>
@@ -66,6 +87,8 @@ export default function AdminADRMonitoringPage() {
             </div>
           ))}
         </div>
+      )}
+        </>
       )}
     </div>
   );

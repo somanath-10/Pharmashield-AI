@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_current_doctor
 from app.models.domain import (
     User, Case, ADRReport, DoctorReview,
-    DoctorPharmacistMessage, VerifiedPrescription, CareTeamLink
+    DoctorPharmacistMessage, VerifiedPrescription, CareTeamLink, RoleEnum
 )
 from app.services.audit import record_audit_log
 from pydantic import BaseModel
@@ -20,35 +20,38 @@ class DoctorDashboardResponse(BaseModel):
 @router.get("/dashboard", response_model=DoctorDashboardResponse)
 async def get_doctor_dashboard(current_user: User = Depends(get_current_doctor)) -> Any:
     """Get aggregate metrics for the doctor."""
-    adrs = await ADRReport.find(ADRReport.status == "NEEDS_DOCTOR_REVIEW").to_list()
+    links = await CareTeamLink.find({"doctor_id": current_user.user_id, "status": "ACTIVE"}).to_list()
+    patient_ids = [l.patient_id for l in links]
+    linked_cases = await Case.find({"user_id": {"$in": patient_ids}, "role": "PATIENT"}).to_list() if patient_ids else []
+    linked_case_ids = [c.case_id for c in linked_cases]
+    adrs = await ADRReport.find(
+        {"status": "NEEDS_DOCTOR_REVIEW", "case_id": {"$in": linked_case_ids}}
+    ).to_list() if linked_case_ids else []
     msgs = await DoctorPharmacistMessage.find(
         DoctorPharmacistMessage.receiver_id == current_user.user_id
     ).to_list()
-    # Count cases where doctor has reviewed or that belong to doctor
-    doctor_cases = await Case.find(Case.role == "DOCTOR").to_list()
     return DoctorDashboardResponse(
         adr_reviews_pending=len(adrs),
         pharmacist_questions=len(msgs),
-        active_patients=len(set(c.user_id for c in doctor_cases))
+        active_patients=len(set(patient_ids))
     )
 
 @router.get("/patients", response_model=List[Dict[str, Any]])
 async def get_patients(current_user: User = Depends(get_current_doctor)) -> Any:
     """
     Get patient summaries for patients that have an ACTIVE CareTeamLink with this doctor.
-    Falls back to all PATIENT cases when no links exist (dev/demo convenience).
+    Returns no cases when no active links exist.
     """
     # Check for consent-based links
     links = await CareTeamLink.find(
         {"doctor_id": current_user.user_id, "status": "ACTIVE"}
     ).to_list()
 
-    if links:
-        patient_ids = [l.patient_id for l in links]
-        patient_cases = await Case.find({"user_id": {"$in": patient_ids}, "role": "PATIENT"}).to_list()
-    else:
-        # Demo/development fallback: show all patient cases
-        patient_cases = await Case.find({"role": "PATIENT"}).to_list()
+    if not links:
+        return []
+
+    patient_ids = [l.patient_id for l in links]
+    patient_cases = await Case.find({"user_id": {"$in": patient_ids}, "role": "PATIENT"}).to_list()
 
     if not patient_cases:
         return []
@@ -79,7 +82,15 @@ async def get_patients(current_user: User = Depends(get_current_doctor)) -> Any:
 @router.get("/adr-reviews", response_model=List[ADRReport])
 async def get_adr_reviews(current_user: User = Depends(get_current_doctor)) -> Any:
     """Get pending ADR reports needing doctor review."""
-    return await ADRReport.find(ADRReport.status == "NEEDS_DOCTOR_REVIEW").to_list()
+    links = await CareTeamLink.find({"doctor_id": current_user.user_id, "status": "ACTIVE"}).to_list()
+    patient_ids = [l.patient_id for l in links]
+    if not patient_ids:
+        return []
+    linked_cases = await Case.find({"user_id": {"$in": patient_ids}, "role": "PATIENT"}).to_list()
+    linked_case_ids = [c.case_id for c in linked_cases]
+    if not linked_case_ids:
+        return []
+    return await ADRReport.find({"status": "NEEDS_DOCTOR_REVIEW", "case_id": {"$in": linked_case_ids}}).to_list()
 
 class ADRActionReq(BaseModel):
     action: str  # e.g., 'CONFIRMED_ADR', 'POSSIBLE_ADR', 'DISMISSED', 'URGENT_CARE'
@@ -91,6 +102,14 @@ async def review_adr(adr_id: str, req: ADRActionReq, current_user: User = Depend
     adr = await ADRReport.find_one(ADRReport.adr_id == adr_id)
     if not adr:
         raise HTTPException(status_code=404, detail="ADR Report not found")
+    case = await Case.find_one(Case.case_id == adr.case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Linked case not found")
+    link = await CareTeamLink.find_one(
+        {"doctor_id": current_user.user_id, "patient_id": case.user_id, "status": "ACTIVE"}
+    )
+    if not link:
+        raise HTTPException(status_code=403, detail="Not authorized to review this ADR")
 
     valid_actions = {"CONFIRMED_ADR", "POSSIBLE_ADR", "DISMISSED", "URGENT_CARE"}
     if req.action not in valid_actions:
@@ -231,6 +250,10 @@ async def create_care_team_link(
     if existing:
         return {"link_id": existing.link_id, "status": "ALREADY_LINKED"}
 
+    patient = await User.find_one({"user_id": req.patient_id, "role": RoleEnum.PATIENT})
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
     link = CareTeamLink(
         patient_id=req.patient_id,
         doctor_id=current_user.user_id,
@@ -240,7 +263,7 @@ async def create_care_team_link(
     await link.insert()
     await record_audit_log(current_user.user_id, "DOCTOR", "CARE_TEAM_LINK_CREATED", "care_team",
                            metadata={"patient_id": req.patient_id})
-    return {"link_id": link.link_id, "status": "ACTIVE"}
+    return {"link_id": link.link_id, "status": "PENDING"}
 
 @router.get("/care-team-links")
 async def get_care_team_links(current_user: User = Depends(get_current_doctor)) -> Any:

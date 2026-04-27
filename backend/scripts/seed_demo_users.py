@@ -24,7 +24,7 @@ from app.models.domain import (
     ExtractedMedicine, ExtractedLabValue, AgentRun, Feedback,
     Citation, PrescriptionExtraction, SellerRiskAssessment,
     BatchVerification, PriceComplianceCheck, SubstitutionCheck,
-    ADRReport, PharmacistReview, DoctorReview,
+    ADRReport, PharmacistReview, DoctorReview, CareTeamLink,
     DoctorPharmacistMessage, VerifiedPrescription, DataSourceSyncStatus,
 )
 from app.services.memory.memory_store import MemoryEntry
@@ -53,7 +53,7 @@ async def seed():
             ExtractedLabValue, AgentRun, Feedback, Citation, MemoryEntry,
             PrescriptionExtraction, SellerRiskAssessment, BatchVerification,
             PriceComplianceCheck, SubstitutionCheck, ADRReport, PharmacistReview,
-            DoctorReview, DoctorPharmacistMessage, VerifiedPrescription, DataSourceSyncStatus,
+            DoctorReview, CareTeamLink, DoctorPharmacistMessage, VerifiedPrescription, DataSourceSyncStatus,
         ],
     )
 

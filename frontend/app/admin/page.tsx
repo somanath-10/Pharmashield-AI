@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { fetchAdminAnalytics, fetchAuditLogs } from '@/lib/api';
+import { getAdminAnalytics, getAdminAuditLogs } from '@/lib/api';
 import type { AdminAnalytics, AuditLogEntry } from '@/lib/api';
 
 const RISK_COLORS: Record<string, string> = {
@@ -37,8 +37,8 @@ export default function AdminDashboard() {
     setLoading(true); setError('');
     try {
       const [a, logs] = await Promise.all([
-        fetchAdminAnalytics(),
-        fetchAuditLogs(10),
+        getAdminAnalytics(),
+        getAdminAuditLogs(10),
       ]);
       setAnalytics(a);
       setAuditLogs(logs.logs);

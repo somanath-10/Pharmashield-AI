@@ -27,7 +27,7 @@ export default function LoginPage() {
     try {
       const formData = new FormData();
       formData.append('username', role.email);
-      formData.append('password', 'demo123'); // Password not strictly checked in MVP auto-provision
+      formData.append('password', 'demo123'); // Password checked against seeded demo accounts
 
       const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
       const response = await fetch(`${apiUrl}/auth/login`, {
@@ -146,7 +146,7 @@ export default function LoginPage() {
         </button>
 
         <p style={{ marginTop: '24px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-          This is an MVP simulator. Clicking will automatically provision a test account and generate a real JWT session token.
+          This is an MVP simulator. Use seeded demo accounts. Run <strong>make seed-users</strong> before login if running locally.
         </p>
       </div>
     </div>

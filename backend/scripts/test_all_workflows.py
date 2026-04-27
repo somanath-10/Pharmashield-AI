@@ -51,15 +51,19 @@ async def main():
         # ──────────────────────────────────────────────────────
         print("\n════ 2. AUTH ════")
         tokens = {}
-        for role_email in ["patient@test.com", "pharmacist@test.com", "doctor@test.com", "admin@test.com"]:
-            r = await c.post(f"{BASE}/auth/login", data={"username": role_email, "password": "any"})
+        for role_email in ["patient@demo.com", "pharmacist@demo.com", "doctor@demo.com", "admin@demo.com"]:
+            r = await c.post(f"{BASE}/auth/login", data={"username": role_email, "password": "demo123"})
             d = check(f"POST /auth/login ({role_email})", r, ["access_token", "token_type"])
             if d:
                 tokens[role_email] = d["access_token"]
 
         # Re-login with existing user (idempotent)
-        r = await c.post(f"{BASE}/auth/login", data={"username": "patient@test.com", "password": "any"})
+        r = await c.post(f"{BASE}/auth/login", data={"username": "patient@demo.com", "password": "demo123"})
         check("POST /auth/login (re-login existing user)", r, ["access_token"])
+
+        admin_headers = {}
+        if tokens.get("admin@demo.com"):
+            admin_headers = {"Authorization": f"Bearer {tokens['admin@demo.com']}"}
 
         # ──────────────────────────────────────────────────────
         # 3. CASE CREATION — all roles + all case_types
@@ -85,20 +89,28 @@ async def main():
         for role, ctype, title, query in combos:
             r = await c.post(f"{BASE}/api/cases", json={
                 "role": role, "case_type": ctype, "title": title, "query": query
-            })
+            }, headers=admin_headers)
             d = check(f"POST /api/cases ({role}/{ctype})", r, ["case_id", "role", "status"])
             if d:
                 case_ids[f"{role}_{ctype}"] = d["case_id"]
 
         # LIST + GET
-        r = await c.get(f"{BASE}/api/cases")
+        r = await c.get(f"{BASE}/api/cases", headers=admin_headers)
         check("GET /api/cases (list all)", r)
 
+        if not case_ids:
+            log("Case creation prerequisite", False, "No case IDs created; cannot continue test suite")
+            print("\n" + "=" * 60)
+            passed = [x for x in RESULTS if x[1]]
+            failed = [x for x in RESULTS if not x[1]]
+            print(f"TOTAL: {len(RESULTS)} | PASS: {len(passed)} | FAIL: {len(failed)}")
+            return
+
         first_id = list(case_ids.values())[0]
-        r = await c.get(f"{BASE}/api/cases/{first_id}")
+        r = await c.get(f"{BASE}/api/cases/{first_id}", headers=admin_headers)
         check("GET /api/cases/{id} (valid)", r, ["case_id"])
 
-        r = await c.get(f"{BASE}/api/cases/nonexistent-id-xyz")
+        r = await c.get(f"{BASE}/api/cases/nonexistent-id-xyz", headers=admin_headers)
         check("GET /api/cases/{id} (invalid → 404)", r, expected_status=404)
 
         # ──────────────────────────────────────────────────────
@@ -110,7 +122,8 @@ async def main():
             dummy_pdf = b"%PDF-1.4 Augmentin 625mg tablet. Take twice daily after food. Dr. Sharma, Reg No. 12345"
             r = await c.post(
                 f"{BASE}/api/cases/{pid}/documents",
-                files={"file": ("prescription.pdf", dummy_pdf, "application/pdf")}
+                files={"file": ("prescription.pdf", dummy_pdf, "application/pdf")},
+                headers=admin_headers
             )
             check("POST /cases/{id}/documents (PDF upload)", r)
 
@@ -120,13 +133,15 @@ async def main():
         print("\n════ 5. DOCUMENT SEARCH ════")
         if pid:
             r = await c.post(f"{BASE}/api/cases/{pid}/search",
-                             json={"query": "Augmentin cheaper alternative generic Jan Aushadhi", "role": "PATIENT"})
+                             json={"query": "Augmentin cheaper alternative generic Jan Aushadhi", "role": "PATIENT"},
+                             headers=admin_headers)
             check("POST /cases/{id}/search (PATIENT)", r)
 
         phid = case_ids.get("PHARMACIST_PHARMACIST_DISPENSING_CHECK")
         if phid:
             r = await c.post(f"{BASE}/api/cases/{phid}/search",
-                             json={"query": "Schedule H1 prescription batch NSQ check", "role": "PHARMACIST"})
+                             json={"query": "Schedule H1 prescription batch NSQ check", "role": "PHARMACIST"},
+                             headers=admin_headers)
             check("POST /cases/{id}/search (PHARMACIST)", r)
 
         # ──────────────────────────────────────────────────────
@@ -212,7 +227,7 @@ async def main():
                 payload["question"] = question
             if ctx:
                 payload["context"] = ctx
-            r = await c.post(f"{BASE}/api/cases/{cid}/analyze", json=payload)
+            r = await c.post(f"{BASE}/api/cases/{cid}/analyze", json=payload, headers=admin_headers)
             d = check(f"POST /analyze ({label})", r, ["case_id", "risk_level", "agents_run"])
             if d:
                 agents = d.get("agents_run", [])
@@ -228,7 +243,7 @@ async def main():
                     log(f"  ↳ risk check ({label})", True, f"risk={risk}")
 
         # Edge case: analyze with invalid case_id
-        r = await c.post(f"{BASE}/api/cases/bad-id-xyz/analyze", json={})
+        r = await c.post(f"{BASE}/api/cases/bad-id-xyz/analyze", json={}, headers=admin_headers)
         check("POST /analyze (invalid case_id → 404)", r, expected_status=404)
 
         # ──────────────────────────────────────────────────────
@@ -291,7 +306,7 @@ async def main():
         ]
 
         for endpoint, label, payload, expected_risk in intel_tests:
-            r = await c.post(f"{BASE}/api/intelligence/{endpoint}", json=payload)
+            r = await c.post(f"{BASE}/api/intelligence/{endpoint}", json=payload, headers=admin_headers)
             d = check(f"POST /intelligence/{endpoint} ({label})", r)
             if d and expected_risk:
                 got = d.get("risk_level", "")
@@ -309,21 +324,21 @@ async def main():
             "drug_name": "TestDrug", "brand_name": "TestBrand",
             "manufacturer": "TestMfr", "batch_number": "TEST-B001",
             "failure_reason": "Dissolution test failed", "alert_type": "NSQ", "source": "CDSCO"
-        })
+        }, headers=admin_headers)
         check("POST /ingest/cdsco-nsq", r, ["id"])
 
         r = await c.post(f"{BASE}/api/ingest/nppa-prices", json={
             "brand_name": "TestBrand", "generic_name": "TestGeneric",
             "composition": "TestComp 500mg", "mrp": 120.0,
             "ceiling_price": 90.0, "source": "NPPA"
-        })
+        }, headers=admin_headers)
         check("POST /ingest/nppa-prices", r, ["id"])
 
         r = await c.post(f"{BASE}/api/ingest/janaushadhi-products", json={
             "generic_name": "TestGeneric", "composition": "TestComp 500mg",
             "strength": "500mg", "dosage_form": "Tablet",
             "janaushadhi_price": 35.0, "availability_status": "AVAILABLE", "source": "PMBJP"
-        })
+        }, headers=admin_headers)
         check("POST /ingest/janaushadhi-products", r, ["id"])
 
         r = await c.post(f"{BASE}/api/ingest/schedule-rules", json={
@@ -331,7 +346,7 @@ async def main():
             "schedule_category": "H", "requires_prescription": True,
             "requires_sales_register": True, "rule_summary": "Prescription required, maintain register.",
             "source": "CDSCO"
-        })
+        }, headers=admin_headers)
         check("POST /ingest/schedule-rules", r, ["id"])
 
         r = await c.post(f"{BASE}/api/ingest/scheme-rules", json={
@@ -341,7 +356,7 @@ async def main():
             "applies_to_retail_pharmacy": True,
             "applies_to_hospitalization": False,
             "source": "Employer"
-        })
+        }, headers=admin_headers)
         check("POST /ingest/scheme-rules", r, ["id"])
 
         r = await c.post(f"{BASE}/api/ingest/suppliers", json={
@@ -350,13 +365,13 @@ async def main():
             "license_number": "DL-77777", "state": "Karnataka",
             "verification_status": "VERIFIED", "risk_score": 0.1,
             "risk_reasons": []
-        })
+        }, headers=admin_headers)
         check("POST /ingest/suppliers", r, ["id"])
 
         # Verify just-ingested NSQ shows in check
         r = await c.post(f"{BASE}/api/intelligence/nsq-check", json={
             "drug_name": "TestDrug", "manufacturer": "TestMfr", "batch_number": "TEST-B001"
-        })
+        }, headers=admin_headers)
         d = check("POST /intelligence/nsq-check (just-ingested batch)", r)
         if d:
             log("  ↳ ingested NSQ picked up", d.get("risk_level") in ("CRITICAL", "MEDIUM"),
@@ -365,7 +380,7 @@ async def main():
         # Verify just-ingested price shows
         r = await c.post(f"{BASE}/api/intelligence/price-check", json={
             "drug_name": "TestBrand", "mrp": 200.0, "patient_budget_sensitive": True
-        })
+        }, headers=admin_headers)
         d = check("POST /intelligence/price-check (just-ingested price, MRP>ceiling)", r)
         if d:
             log("  ↳ MRP violation detected", d.get("risk_level") == "HIGH",
@@ -380,7 +395,7 @@ async def main():
             r = await c.post(f"{BASE}/api/cases/{cid}/feedback", json={
                 "rating": 5,
                 "feedback_text": f"Workflow test for {case_key} — accurate and safe response"
-            })
+            }, headers=admin_headers)
             check(f"POST /cases/{cid[:8]}.../feedback ({case_key})", r, ["feedback_id", "status"])
 
         # Feedback with correction
@@ -389,20 +404,20 @@ async def main():
                 "rating": 3,
                 "feedback_text": "Good but missed the Jan Aushadhi option",
                 "correction_text": "Should mention PM-JAY does not cover retail OPD"
-            })
+            }, headers=admin_headers)
             check("POST /cases/feedback (with correction_text)", r, ["feedback_id"])
 
         # Feedback on non-existent case
         r = await c.post(f"{BASE}/api/cases/bad-case-id/feedback", json={
             "rating": 5, "feedback_text": "Test"
-        })
+        }, headers=admin_headers)
         check("POST /cases/feedback (invalid case → 404)", r, expected_status=404)
 
         # ──────────────────────────────────────────────────────
         # 10. ADMIN ANALYTICS
         # ──────────────────────────────────────────────────────
         print("\n════ 10. ADMIN ANALYTICS ════")
-        r = await c.get(f"{BASE}/api/admin/analytics")
+        r = await c.get(f"{BASE}/api/admin/analytics", headers=admin_headers)
         d = check("GET /api/admin/analytics", r, [
             "total_cases", "high_risk_cases", "nsq_matches",
             "online_seller_risk_cases", "prescription_compliance_warnings",
@@ -416,7 +431,7 @@ async def main():
             print(f"  audit_log_entries={len(d.get('recent_audit_logs', []))}")
             print(f"  avg_feedback={d.get('average_feedback_rating')}")
 
-        r = await c.get(f"{BASE}/api/admin/audit-logs?limit=10")
+        r = await c.get(f"{BASE}/api/admin/audit-logs?limit=10", headers=admin_headers)
         d = check("GET /api/admin/audit-logs", r, ["count", "logs"])
         if d:
             print(f"  audit logs returned: {d.get('count')}")

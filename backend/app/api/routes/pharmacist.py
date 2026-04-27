@@ -4,7 +4,7 @@ from app.api.deps import get_current_pharmacist
 from app.models.domain import (
     User, Case, BatchVerification, PrescriptionExtraction,
     PriceComplianceCheck, SubstitutionCheck, ADRReport,
-    PharmacistReview, CaseStatusEnum
+    PharmacistReview, DoctorPharmacistMessage, CaseStatusEnum
 )
 from app.services.audit import record_audit_log
 from pydantic import BaseModel
@@ -47,7 +47,8 @@ class PharmacistDashboardResponse(BaseModel):
 @router.get("/dashboard", response_model=PharmacistDashboardResponse)
 async def get_pharmacist_dashboard(current_user: User = Depends(get_current_pharmacist)) -> Any:
     """Get aggregate metrics for the pharmacist."""
-    cases = await Case.find(Case.status == "NEEDS_REVIEW").to_list()
+    # Global NEEDS_REVIEW count for demo visibility
+    cases = await Case.find(Case.status == CaseStatusEnum.NEEDS_REVIEW).to_list()
     batches = await BatchVerification.find(BatchVerification.is_quarantined == True).to_list()
     
     return PharmacistDashboardResponse(
@@ -58,8 +59,8 @@ async def get_pharmacist_dashboard(current_user: User = Depends(get_current_phar
 
 @router.get("/review-queue", response_model=List[Case])
 async def get_review_queue(current_user: User = Depends(get_current_pharmacist)) -> Any:
-    """List cases pending pharmacist action."""
-    return await Case.find(Case.status == "NEEDS_REVIEW").to_list()
+    """List all cases pending pharmacist action across the system."""
+    return await Case.find(Case.status == CaseStatusEnum.NEEDS_REVIEW).to_list()
 
 class BatchCheckReq(BaseModel):
     case_id: Optional[str] = None
@@ -150,7 +151,9 @@ class ADRDraftReq(BaseModel):
 
 @router.post("/adr-draft", response_model=ADRReport)
 async def create_adr_draft(req: ADRDraftReq, current_user: User = Depends(get_current_pharmacist)) -> Any:
-    """Create an ADR report draft pending doctor review."""
+    """Create an ADR report draft pending doctor review. Requires a real case_id."""
+    if not req.case_id:
+        raise HTTPException(status_code=400, detail="case_id is required for ADR drafts to ensure clinical visibility")
     await ensure_case_exists(req.case_id)
     adr = ADRReport(
         case_id=req.case_id,
@@ -168,7 +171,6 @@ async def create_adr_draft(req: ADRDraftReq, current_user: User = Depends(get_cu
     return adr
 
 class ReviewReq(BaseModel):
-    case_id: str
     action_taken: str
     notes: str
 
@@ -179,6 +181,9 @@ async def submit_review(case_id: str, req: ReviewReq, current_user: User = Depen
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
         
+    if case.status != CaseStatusEnum.NEEDS_REVIEW:
+        raise HTTPException(status_code=400, detail="Case is not pending pharmacist review")
+
     case.status = CaseStatusEnum.PHARMACIST_REVIEWED
     await case.save()
     
@@ -218,17 +223,19 @@ async def record_dispensing_decision(
         )
 
     case = await Case.find_one(Case.case_id == req.case_id)
-    if case:
-        # Update case status based on dispensing decision
-        if req.dispensing_status == "CAN_DISPENSE":
-            case.status = CaseStatusEnum.RESOLVED
-        elif req.dispensing_status == "DO_NOT_DISPENSE":
-            case.status = CaseStatusEnum.ESCALATED
-        elif req.dispensing_status in ("NEEDS_DOCTOR_CLARIFICATION", "QUARANTINE_BATCH"):
-            case.status = CaseStatusEnum.NEEDS_REVIEW
-        else:
-            case.status = CaseStatusEnum.PHARMACIST_REVIEWED
-        await case.save()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found. Dispensing decision must be linked to a real case.")
+
+    # Update case status based on dispensing decision
+    if req.dispensing_status == "CAN_DISPENSE":
+        case.status = CaseStatusEnum.RESOLVED
+    elif req.dispensing_status == "DO_NOT_DISPENSE":
+        case.status = CaseStatusEnum.ESCALATED
+    elif req.dispensing_status in ("NEEDS_DOCTOR_CLARIFICATION", "QUARANTINE_BATCH"):
+        case.status = CaseStatusEnum.NEEDS_REVIEW
+    else:
+        case.status = CaseStatusEnum.PHARMACIST_REVIEWED
+    await case.save()
 
     # Record as a PharmacistReview
     review = PharmacistReview(
@@ -250,6 +257,33 @@ async def record_dispensing_decision(
         "medicine": req.medicine_name,
         "case_id": req.case_id,
     }
+
+# ─── Doctor Consultation ──────────────────────────────────────────────────────
+
+class AskDoctorReq(BaseModel):
+    doctor_id: str
+    case_id: str
+    message: str
+
+@router.post("/ask-doctor")
+async def ask_doctor_question(
+    req: AskDoctorReq,
+    current_user: User = Depends(get_current_pharmacist)
+) -> Any:
+    """Send a clinical query to a doctor regarding a specific case."""
+    await ensure_case_exists(req.case_id)
+    
+    msg = DoctorPharmacistMessage(
+        case_id=req.case_id,
+        sender_id=current_user.user_id,
+        sender_role="PHARMACIST",
+        receiver_id=req.doctor_id,
+        message=req.message
+    )
+    await msg.insert()
+    await record_audit_log(current_user.user_id, "PHARMACIST", "PHARMACIST_ASK_DOCTOR", "message",
+                           case_id=req.case_id, metadata={"doctor_id": req.doctor_id})
+    return msg
 
 @router.get("/dispensing-statuses")
 async def get_dispensing_statuses(current_user: User = Depends(get_current_pharmacist)):

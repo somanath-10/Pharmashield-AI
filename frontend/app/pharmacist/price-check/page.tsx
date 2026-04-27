@@ -8,20 +8,21 @@ export default function PriceCheckPage() {
   const [formData, setFormData] = useState({ medicine_name: '', mrp: '', charged_price: '' });
   const [result, setResult] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleCheck = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     setLoading(true);
     try {
       const res = await performPriceCheck({
-        case_id: 'draft-' + Date.now(),
         medicine_name: formData.medicine_name,
         mrp: parseFloat(formData.mrp),
         charged_price: parseFloat(formData.charged_price)
       });
       setResult(res);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to check price compliance');
     }
     setLoading(false);
   };
@@ -55,6 +56,7 @@ export default function PriceCheckPage() {
           {loading ? 'Checking...' : 'Check Compliance'}
         </button>
       </form>
+      {error && <div className="glass-card" style={{ padding: '16px', marginBottom: '20px', color: '#f87171' }}>❌ {error}</div>}
 
       {result && (
         <div className="glass-card animate-in" style={{ padding: '24px', borderColor: result.is_overcharged ? '#ef4444' : '#34d399' }}>

@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from app.models.domain import Case, RoleEnum, UserDocument, AgentRun, User
+from app.models.domain import Case, RoleEnum, UserDocument, AgentRun, User, SellerRiskAssessment
 from app.api.deps import get_current_active_user
 from app.schemas.case import CaseCreateRequest, CaseRecordResponse, CaseAnalyzeResponse, DocumentUploadResponse
 from app.services.agents.patient_agent import PatientAgent
@@ -176,6 +176,20 @@ async def analyze_case(case_id: str, request: Optional[AnalyzeRequest] = None, c
         intel_results.append(seller_result)
         agents_run.append("online_seller_risk_agent")
         overall_risk = escalate_risk(overall_risk, seller_result["risk_level"])
+        
+        # Persist assessment for admin analytics
+        assessment = SellerRiskAssessment(
+            case_id=case_id,
+            seller_name=ctx.get("seller_name"),
+            seller_type=ctx.get("seller_type") or "Unknown",
+            license_present=ctx.get("license_number") is not None,
+            invoice_present=ctx.get("invoice_present", False),
+            risk_score=seller_result.get("risk_score", 0.0),
+            risk_level=seller_result["risk_level"],
+            explanation=seller_result.get("explanation", "Seller risk check performed."),
+            next_step=seller_result.get("next_step", "Verify documentation.")
+        )
+        await assessment.insert()
 
     # --- Scheme / Claim Agent ---
     if "ayushman" in query.lower() or "pm-jay" in query.lower() or "cghs" in query.lower() or "esic" in query.lower() or ctx.get("scheme_name"):
@@ -242,7 +256,10 @@ async def analyze_case(case_id: str, request: Optional[AnalyzeRequest] = None, c
     await run.insert()
 
     from app.models.domain import CaseStatusEnum
-    target_case.status = CaseStatusEnum.ANALYZED
+    if overall_risk in ("HIGH", "CRITICAL"):
+        target_case.status = CaseStatusEnum.NEEDS_REVIEW
+    else:
+        target_case.status = CaseStatusEnum.ANALYZED
     target_case.risk_level = overall_risk
     target_case.final_summary = json.dumps(result_data)
     await target_case.save()

@@ -28,6 +28,6 @@ logs:
 
 clean-zip:
 	zip -r Pharmashield-AI-final.zip . \
-	  -x "*/.git/*" "*/.next/*" "*/node_modules/*" "*/__pycache__/*" \
-	  "*/.pytest_cache/*" "*/.DS_Store" "*/__MACOSX/*" "*.env" \
-	  "*.egg-info/*" "*/venv/*"
+	  -x ".git/*" "*/.git/*" ".next/*" "*/.next/*" "node_modules/*" "*/node_modules/*" "*/__pycache__/*" \
+	  ".pytest_cache/*" "*/.pytest_cache/*" ".DS_Store" "*/.DS_Store" "__MACOSX/*" "*/__MACOSX/*" "*.env" \
+	  "*.egg-info/*" "*/venv/*" "*.tsbuildinfo"

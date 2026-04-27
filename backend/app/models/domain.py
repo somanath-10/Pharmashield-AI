@@ -226,7 +226,7 @@ class SellerRiskAssessment(Document):
 
 class BatchVerification(Document):
     verification_id: Indexed(str) = Field(default_factory=uuid_str)
-    case_id: Indexed(str)
+    case_id: Optional[Indexed(str)] = None
     medicine_name: str
     batch_number: str
     expiry_date: Optional[str] = None
@@ -242,7 +242,7 @@ class BatchVerification(Document):
 
 class PriceComplianceCheck(Document):
     check_id: Indexed(str) = Field(default_factory=uuid_str)
-    case_id: Indexed(str)
+    case_id: Optional[Indexed(str)] = None
     medicine_name: str
     mrp: float
     charged_price: float
@@ -255,7 +255,7 @@ class PriceComplianceCheck(Document):
 
 class SubstitutionCheck(Document):
     check_id: Indexed(str) = Field(default_factory=uuid_str)
-    case_id: Indexed(str)
+    case_id: Optional[Indexed(str)] = None
     prescribed_medicine: str
     substituted_medicine: str
     is_safe: bool = False
@@ -267,7 +267,7 @@ class SubstitutionCheck(Document):
 
 class ADRReport(Document):
     adr_id: Indexed(str) = Field(default_factory=uuid_str)
-    case_id: Indexed(str)
+    case_id: Optional[Indexed(str)] = None
     patient_age_range: Optional[str] = None
     medicine_name: str
     batch_number: Optional[str] = None

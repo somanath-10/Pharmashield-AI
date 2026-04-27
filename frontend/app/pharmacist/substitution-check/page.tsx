@@ -8,19 +8,20 @@ export default function SubstitutionCheckPage() {
   const [formData, setFormData] = useState({ prescribed: '', substituted: '' });
   const [result, setResult] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleCheck = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     setLoading(true);
     try {
       const res = await performSubstitutionCheck({
-        case_id: 'draft-' + Date.now(),
         prescribed_medicine: formData.prescribed,
         substituted_medicine: formData.substituted
       });
       setResult(res);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to validate substitution');
     }
     setLoading(false);
   };
@@ -46,6 +47,7 @@ export default function SubstitutionCheckPage() {
           {loading ? 'Checking...' : 'Compare Medicines'}
         </button>
       </form>
+      {error && <div className="glass-card" style={{ padding: '16px', marginBottom: '20px', color: '#f87171' }}>❌ {error}</div>}
 
       {result && (
         <div className="glass-card animate-in" style={{ padding: '24px', borderColor: result.is_safe ? '#34d399' : '#ef4444' }}>

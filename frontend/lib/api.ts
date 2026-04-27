@@ -71,6 +71,7 @@ export async function uploadDocument(caseId: string, file: File): Promise<{
   status: string;
   document_type: string;
   chunks_created: number;
+  message?: string;
 }> {
   const formData = new FormData();
   formData.append("file", file);
@@ -184,26 +185,26 @@ export async function getPharmacistReviewQueue(): Promise<any[]> {
 }
 
 export async function performBatchCheck(data: {
-  case_id: string; medicine_name: string; batch_number: string;
+  case_id?: string; medicine_name: string; batch_number: string;
   expiry_date?: string; manufacturer?: string; supplier?: string;
 }): Promise<any> {
   return req<any>('/api/pharmacist/batch-check', { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function performPriceCheck(data: {
-  case_id: string; medicine_name: string; mrp: number; charged_price: number;
+  case_id?: string; medicine_name: string; mrp: number; charged_price: number;
 }): Promise<any> {
   return req<any>('/api/pharmacist/price-check', { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function performSubstitutionCheck(data: {
-  case_id: string; prescribed_medicine: string; substituted_medicine: string;
+  case_id?: string; prescribed_medicine: string; substituted_medicine: string;
 }): Promise<any> {
   return req<any>('/api/pharmacist/substitution-check', { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function createPharmacistADRDraft(data: {
-  case_id: string; medicine_name: string; reaction: string; severity: string; timeline: string;
+  case_id?: string; medicine_name: string; reaction: string; severity: string; timeline: string;
   patient_age_range?: string; batch_number?: string;
 }): Promise<any> {
   return req<any>('/api/pharmacist/adr-draft', { method: 'POST', body: JSON.stringify(data) });
@@ -219,9 +220,8 @@ export async function getDoctorDashboard(): Promise<any> {
   return req<any>('/api/doctor/dashboard');
 }
 
-export async function getDoctorPatients(): Promise<any[]> {
-  return req<any[]>('/api/doctor/patients');
-}
+// getDoctorPatients moved to consolidation section below
+
 
 export async function getDoctorADRReviews(): Promise<any[]> {
   return req<any[]>('/api/doctor/adr-reviews');
@@ -237,13 +237,8 @@ export async function generateDoctorPrescription(data: { patient_name: string; m
 
 // --- Admin Phase 2 & 7 Endpoints ---
 
-export async function getAdminAnalytics(): Promise<any> {
-  return req<any>('/api/admin/analytics');
-}
+// getAdminAnalytics and getAdminAuditLogs moved to consolidation section below
 
-export async function getAdminAuditLogs(limit: number = 50): Promise<any> {
-  return req<any>(`/api/admin/audit-logs?limit=${limit}`);
-}
 export async function checkPrice(payload: {
   drug_name: string;
   composition?: string;
@@ -337,11 +332,11 @@ export interface AuditLogEntry {
   created_at: string;
 }
 
-export async function fetchAdminAnalytics(): Promise<AdminAnalytics> {
+export async function getAdminAnalytics(): Promise<AdminAnalytics> {
   return req<AdminAnalytics>("/api/admin/analytics");
 }
 
-export async function fetchAuditLogs(limit = 20): Promise<{ count: number; logs: AuditLogEntry[] }> {
+export async function getAdminAuditLogs(limit = 20): Promise<{ count: number; logs: AuditLogEntry[] }> {
   return req(`/api/admin/audit-logs?limit=${limit}`);
 }
 
@@ -356,18 +351,33 @@ export interface Citation {
 
 // ─── Admin Extended Endpoints ─────────────────────────────────────────────────
 
-export const getAdminRiskQueues = () => req<any[]>('/api/admin/risk-queues');
+export const getAdminRiskQueues = () => req<{
+  high_risk_cases?: any[];
+  needs_review?: any[];
+  pharmacist_reviewed?: any[];
+  escalated?: any[];
+  adr_pending_count?: number;
+  batch_quarantine_count?: number;
+  price_issues_count?: number;
+}>('/api/admin/risk-queues');
 export const getAdminDataSources = () => req<any[]>('/api/admin/data-sources');
 export const getAdminModelQuality = () => req<any>('/api/admin/model-quality');
 export const getAdminBatchAnalytics = () => req<any>('/api/admin/analytics/batches');
 export const getAdminSellerAnalytics = () => req<any>('/api/admin/analytics/sellers');
 export const getAdminPriceAnalytics = () => req<any>('/api/admin/analytics/prices');
-export const getAdminADRMonitoring = () => req<any[]>('/api/admin/adr-monitoring');
+export const getAdminADRMonitoring = () => req<{
+  summary?: {
+    total_adr_reports?: number;
+    pending_doctor_review?: number;
+    reviewed?: number;
+  };
+  reports?: any[];
+}>('/api/admin/adr-monitoring');
 
 // ─── Pharmacist Dispensing Decision ──────────────────────────────────────────
 
 export async function recordDispensingDecision(data: {
-  case_id?: string;
+  case_id: string;
   medicine_name: string;
   dispensing_status: string;
   notes?: string;
@@ -391,4 +401,19 @@ export async function getCareTeamLinks(): Promise<any[]> {
 
 export async function revokeCareTeamLink(patientId: string): Promise<any> {
   return req(`/api/doctor/care-team-links/${patientId}`, { method: 'DELETE' });
+}
+
+export async function getDoctorMessages(): Promise<any[]> {
+  return req('/api/doctor/messages');
+}
+
+export async function replyToDoctorMessage(messageId: string, message: string): Promise<any> {
+  return req(`/api/doctor/messages/${messageId}/reply`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  });
+}
+
+export async function getDoctorPatients(): Promise<any[]> {
+  return req('/api/doctor/patients');
 }

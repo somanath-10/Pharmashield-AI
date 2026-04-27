@@ -42,12 +42,12 @@ export default function AdminModelQualityPage() {
       ) : data ? (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
-            <StatCard label="Total Agent Runs" value={data.total_runs ?? 0} />
+            <StatCard label="Total Agent Runs" value={data.total_ai_analyses ?? 0} />
             <StatCard label="Avg Feedback" value={data.average_feedback_rating != null ? `${Number(data.average_feedback_rating).toFixed(1)} / 5` : 'N/A'} />
-            <StatCard label="Low Confidence Runs" value={data.low_confidence_runs ?? 0} sub="< 60% confidence" />
+            <StatCard label="Low Confidence Runs" value={data.low_confidence_flags ?? 0} sub="< 60% confidence" />
           </div>
 
-          {data.agent_run_breakdown && Object.keys(data.agent_run_breakdown).length > 0 && (
+          {data.agent_breakdown && Object.keys(data.agent_breakdown).length > 0 && (
             <div className="glass-card" style={{ padding: '24px' }}>
               <h3 style={{ marginBottom: '16px', fontSize: '1rem', fontWeight: 700 }}>Agent Breakdown</h3>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
@@ -58,7 +58,7 @@ export default function AdminModelQualityPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(data.agent_run_breakdown).map(([agent, count]) => (
+                  {Object.entries(data.agent_breakdown).map(([agent, count]) => (
                     <tr key={agent} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <td style={{ padding: '8px' }}>{agent}</td>
                       <td style={{ padding: '8px', color: '#60a5fa', fontWeight: 700 }}>{String(count)}</td>

@@ -18,7 +18,15 @@ export default function AdminRiskQueuesPage() {
 
   useEffect(() => {
     (async () => {
-      try { setQueues(await getAdminRiskQueues()); }
+      try {
+        const data = await getAdminRiskQueues();
+        setQueues([
+          ...(data.high_risk_cases || []),
+          ...(data.needs_review || []),
+          ...(data.pharmacist_reviewed || []),
+          ...(data.escalated || []),
+        ]);
+      }
       catch (e: any) { setError(e?.message || 'Failed to load risk queues'); }
       setLoading(false);
     })();

@@ -35,26 +35,26 @@ export default function AdminBatchAnalyticsPage() {
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
             <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#ef4444' }}>{data.total_quarantined ?? 0}</div>
-              <div style={{ marginTop: '8px' }}>Quarantined Batches</div>
+              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#ef4444' }}>{data.flagged_batches?.length ?? 0}</div>
+              <div style={{ marginTop: '8px' }}>Flagged Batches</div>
             </div>
             <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#60a5fa' }}>{data.total_checked ?? 0}</div>
-              <div style={{ marginTop: '8px' }}>Total Checked</div>
+              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#60a5fa' }}>{data.total_batch_checks ?? 0}</div>
+              <div style={{ marginTop: '8px' }}>Total Batch Checks</div>
             </div>
             <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#f97316' }}>{data.high_risk ?? 0}</div>
-              <div style={{ marginTop: '8px' }}>High Risk</div>
+              <div style={{ fontSize: '1rem', fontWeight: 600, color: '#f97316', minHeight: '2.5rem' }}>{data.note ?? 'No note available'}</div>
+              <div style={{ marginTop: '8px' }}>Status Note</div>
             </div>
           </div>
 
-          {data.by_manufacturer && Object.keys(data.by_manufacturer).length > 0 && (
+          {data.flagged_batches && data.flagged_batches.length > 0 && (
             <div className="glass-card" style={{ padding: '24px' }}>
-              <h3 style={{ marginBottom: '16px', fontWeight: 700 }}>By Manufacturer</h3>
-              {Object.entries(data.by_manufacturer).map(([mfr, count]) => (
-                <div key={mfr} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <span>{mfr}</span>
-                  <span style={{ color: '#f97316', fontWeight: 700 }}>{String(count)}</span>
+              <h3 style={{ marginBottom: '16px', fontWeight: 700 }}>Flagged Batch IDs</h3>
+              {data.flagged_batches.map((batch: string, idx: number) => (
+                <div key={`${batch}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span>{batch}</span>
+                  <span style={{ color: '#f97316', fontWeight: 700 }}>FLAGGED</span>
                 </div>
               ))}
             </div>

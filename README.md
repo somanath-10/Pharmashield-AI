@@ -30,17 +30,25 @@ PharmaShield India AI is a state-of-the-art, memory-aware multi-agent RAG platfo
 
 2. **Launch with Docker**:
    ```bash
-   docker-compose up --build
+   make up
    ```
 
-3. **Access the Portals**:
+3. **Seed Demo Users (required for login)**:
+   ```bash
+   make seed-users
+   ```
+
+4. **Access the Portals**:
    - **Frontend**: [http://localhost:3000](http://localhost:3000)
    - **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-4. **Verify System**:
+5. **Verify System**:
    ```bash
-   # Run comprehensive end-to-end test suite
-   python backend/scripts/test_all_workflows.py
+   # Run unit tests (logic & RBAC)
+   make test-unit
+   
+   # Run integration tests (requires full DB)
+   make test-integration
    ```
 
 ---

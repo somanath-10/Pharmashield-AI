@@ -8,18 +8,19 @@ export default function ADRDraftsPage() {
   const [formData, setFormData] = useState({ medicine_name: '', reaction: '', severity: 'Moderate', timeline: '', batch_number: '', patient_age_range: '' });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     setLoading(true);
     try {
       await createPharmacistADRDraft({
-        case_id: 'draft-' + Date.now(),
         ...formData
       });
       setSuccess(true);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to create ADR draft');
     }
     setLoading(false);
   };
@@ -42,6 +43,7 @@ export default function ADRDraftsPage() {
         </div>
       ) : (
         <form className="glass-card" style={{ padding: '28px' }} onSubmit={handleSubmit}>
+          {error && <div style={{ marginBottom: '16px', color: '#f87171' }}>❌ {error}</div>}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
             <div>
               <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Medicine Name</label>

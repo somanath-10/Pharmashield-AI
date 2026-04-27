@@ -3,6 +3,8 @@ import { Inter } from 'next/font/google'
 
 const inter = Inter({ subsets: ['latin'] })
 
+import LogoutButton from './components/LogoutButton'
+
 export const metadata = {
   title: 'PharmaShield India AI',
   description: 'Role-Based AI Assistant for Patients, Doctors, and Pharmacists',
@@ -40,19 +42,7 @@ export default function RootLayout({
             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
               Role-Based Healthcare Assistant
             </span>
-            <a href="/login" style={{ 
-              textDecoration: 'none',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              color: 'var(--text-primary)',
-              background: 'rgba(255,255,255,0.06)',
-              padding: '6px 14px',
-              borderRadius: '8px',
-              border: '1px solid rgba(255,255,255,0.1)',
-              transition: 'all 0.2s'
-            }}>
-              Log Out
-            </a>
+            <LogoutButton />
           </div>
         </nav>
 

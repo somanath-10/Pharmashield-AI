@@ -47,10 +47,10 @@ export default function AuditLogsPage() {
             <tbody>
               {logs.map((log: any) => (
                 <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <td style={{ padding: '12px 8px', color: 'var(--text-secondary)' }}>{new Date(log.timestamp).toLocaleString()}</td>
+                  <td style={{ padding: '12px 8px', color: 'var(--text-secondary)' }}>{new Date(log.created_at).toLocaleString()}</td>
                   <td style={{ padding: '12px 8px', color: '#60a5fa' }}>{log.action}</td>
-                  <td style={{ padding: '12px 8px' }}>{log.actor_id}</td>
-                  <td style={{ padding: '12px 8px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px' }}>{JSON.stringify(log.details)}</td>
+                  <td style={{ padding: '12px 8px' }}>{log.user_id}</td>
+                  <td style={{ padding: '12px 8px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px' }}>{JSON.stringify(log.metadata)}</td>
                 </tr>
               ))}
             </tbody>

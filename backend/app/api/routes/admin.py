@@ -5,7 +5,11 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List
 from fastapi import APIRouter, Depends
-from app.models.domain import Case, Feedback, AgentRun, User, RoleEnum, RiskLevelEnum, CaseStatusEnum, DataSourceSyncStatus
+from app.models.domain import (
+    Case, Feedback, AgentRun, User, RoleEnum, RiskLevelEnum, CaseStatusEnum, 
+    DataSourceSyncStatus, ADRReport, BatchVerification, PriceComplianceCheck,
+    SellerRiskAssessment
+)
 from app.api.deps import get_current_admin
 from app.services.audit import get_audit_logs
 
@@ -34,10 +38,11 @@ async def get_analytics(current_user: User = Depends(get_current_admin)) -> Dict
         for ag in agents:
             agent_counts[ag] = agent_counts.get(ag, 0) + 1
 
-    nsq_matches = agent_counts.get("nsq_spurious_agent", 0)
-    online_seller_risk = agent_counts.get("online_seller_risk_agent", 0)
+    # Intelligence metrics from domain models
+    nsq_matches = await BatchVerification.find(BatchVerification.is_quarantined == True).count()
+    online_seller_risk = await SellerRiskAssessment.find(SellerRiskAssessment.risk_level.in_(["HIGH", "CRITICAL"])).count()
     compliance_warnings = agent_counts.get("prescription_compliance_agent", 0)
-    affordability_requests = agent_counts.get("price_janaushadhi_agent", 0)
+    affordability_requests = await PriceComplianceCheck.find(PriceComplianceCheck.is_overcharged == True).count()
 
     # Feedback
     all_feedback = await Feedback.find_all().to_list()
@@ -84,76 +89,108 @@ async def get_risk_queues(current_user: User = Depends(get_current_admin)) -> Di
             "created_at": c.created_at.isoformat() if c.created_at else None,
         }
 
-    high_risk = [_serialize(c) for c in all_cases if c.risk_level in ("HIGH", "CRITICAL")]
-    needs_review = [_serialize(c) for c in all_cases if hasattr(c.status, "value") and c.status == CaseStatusEnum.NEEDS_REVIEW]
-    pending_pharmacist = [_serialize(c) for c in all_cases if hasattr(c.status, "value") and c.status == CaseStatusEnum.PHARMACIST_REVIEWED]
-    escalated = [_serialize(c) for c in all_cases if hasattr(c.status, "value") and c.status == CaseStatusEnum.ESCALATED]
+    high_risk_raw = [c for c in all_cases if c.risk_level in ("HIGH", "CRITICAL")]
+    needs_review_raw = [c for c in all_cases if c.status == CaseStatusEnum.NEEDS_REVIEW]
+    pharmacist_reviewed_raw = [c for c in all_cases if c.status == CaseStatusEnum.PHARMACIST_REVIEWED]
+    escalated_raw = [c for c in all_cases if c.status == CaseStatusEnum.ESCALATED]
+
+    # Deduplicate: if a case is in multiple queues (e.g. HIGH risk and NEEDS_REVIEW), prioritize status-based queues
+    high_risk_ids = {c.case_id for c in high_risk_raw}
+    status_case_ids = {c.case_id for c in needs_review_raw + pharmacist_reviewed_raw + escalated_raw}
+    
+    # Only show in high_risk if NOT in a status-specific queue
+    high_risk = [_serialize(c) for c in high_risk_raw if c.case_id not in status_case_ids]
+    needs_review = [_serialize(c) for c in needs_review_raw]
+    pharmacist_reviewed = [_serialize(c) for c in pharmacist_reviewed_raw]
+    escalated = [_serialize(c) for c in escalated_raw]
+
+    # Fetch real counts for the other queues
+    adr_pending = await ADRReport.find(ADRReport.status == "NEEDS_DOCTOR_REVIEW").count()
+    batch_quarantine = await BatchVerification.find(BatchVerification.is_quarantined == True).count()
+    price_issues = await PriceComplianceCheck.find(PriceComplianceCheck.is_overcharged == True).count()
 
     return {
         "high_risk_cases": high_risk,
         "needs_review": needs_review,
-        "pending_pharmacist_review": pending_pharmacist,
+        "pharmacist_reviewed": pharmacist_reviewed,
         "escalated": escalated,
-        "adr_pending": [],   # Populated when ADRReport model is extended
-        "batch_quarantine": [],  # Populated when BatchVerification model is extended
-        "price_issues": [],      # Populated when PriceComplianceCheck model is extended
+        "adr_pending_count": adr_pending,
+        "batch_quarantine_count": batch_quarantine,
+        "price_issues_count": price_issues,
     }
 
 
 @router.get("/analytics/batches")
 async def get_batch_analytics(current_user: User = Depends(get_current_admin)) -> Dict[str, Any]:
-    """Batch-level analytics aggregated from case metadata."""
-    all_runs = await AgentRun.find_all().to_list()
-    nsq_cases = [r for r in all_runs if "nsq_spurious_agent" in r.input_json.get("agents_run", [])]
+    """Batch-level analytics from real verification records."""
+    all_verifications = await BatchVerification.find_all().to_list()
+    quarantined = [v for v in all_verifications if v.is_quarantined]
+    
+    # Group by manufacturer
+    mfr_counts: Dict[str, int] = {}
+    for v in quarantined:
+        mfr = v.manufacturer or "Unknown"
+        mfr_counts[mfr] = mfr_counts.get(mfr, 0) + 1
+
     return {
-        "total_batch_checks": len(nsq_cases),
-        "flagged_batches": [
-            r.output_json.get("batch_number", "Unknown")
-            for r in nsq_cases
-            if r.output_json.get("risk_level") in ("HIGH", "CRITICAL")
-        ],
-        # TODO: Connect to BatchVerification documents when model is seeded
-        "note": "Batch analytics shown from agent run history. Seed BatchVerification records for full detail.",
+        "total_checked": len(all_verifications),
+        "total_quarantined": len(quarantined),
+        "high_risk": sum(1 for v in all_verifications if v.risk_level == RiskLevelEnum.HIGH),
+        "by_manufacturer": mfr_counts,
+        "flagged_batches": [v.batch_number for v in quarantined],
     }
 
 
 @router.get("/analytics/sellers")
 async def get_seller_analytics(current_user: User = Depends(get_current_admin)) -> Dict[str, Any]:
-    """Seller-level risk analytics."""
-    all_runs = await AgentRun.find_all().to_list()
-    seller_cases = [r for r in all_runs if "online_seller_risk_agent" in r.input_json.get("agents_run", [])]
+    """Seller-level risk analytics from real assessments."""
+    all_assessments = await SellerRiskAssessment.find_all().to_list()
+    high_risk = [a for a in all_assessments if a.risk_level in ("HIGH", "CRITICAL")]
+    
     return {
-        "total_seller_risk_checks": len(seller_cases),
-        "high_risk_seller_cases": sum(
-            1 for r in seller_cases if r.output_json.get("risk_level") in ("HIGH", "CRITICAL")
-        ),
-        "note": "Seller analytics from agent run history. SellerRiskAssessment model seeding pending.",
+        "total_seller_checks": len(all_assessments),
+        "high_risk_count": len(high_risk),
+        "flagged_sellers": list(set(a.seller_name for a in high_risk if a.seller_name)),
     }
 
 
 @router.get("/analytics/prices")
 async def get_price_analytics(current_user: User = Depends(get_current_admin)) -> Dict[str, Any]:
-    """Price compliance analytics."""
-    all_runs = await AgentRun.find_all().to_list()
-    price_cases = [r for r in all_runs if "price_janaushadhi_agent" in r.input_json.get("agents_run", [])]
+    """Price compliance analytics from real check records."""
+    all_checks = await PriceComplianceCheck.find_all().to_list()
+    overcharged = [c for c in all_checks if c.is_overcharged]
     return {
-        "total_price_checks": len(price_cases),
-        "affordability_flags": sum(
-            1 for r in price_cases if r.output_json.get("risk_level") in ("MEDIUM", "HIGH", "CRITICAL")
-        ),
-        "note": "Price analytics sourced from agent run history. NPPA adapter integration pending.",
+        "total_price_checks": len(all_checks),
+        "overcharged_count": len(overcharged),
+        "affordability_flags": len(overcharged), # Simplification for demo
     }
 
 
 @router.get("/adr-monitoring")
 async def get_adr_monitoring(current_user: User = Depends(get_current_admin)) -> Dict[str, Any]:
-    """ADR report monitoring summary."""
-    # TODO: Query ADRReport documents when pharmacist ADR draft workflow populates them
+    """ADR report monitoring summary and report list."""
+    all_adrs = await ADRReport.find_all().to_list()
+    
     return {
-        "total_adr_drafts": 0,
-        "pending_doctor_review": 0,
-        "submitted_externally": 0,
-        "note": "ADR monitoring active. Pharmacist ADR drafts will appear here when submitted.",
+        "summary": {
+            "total_adr_reports": len(all_adrs),
+            "pending_doctor_review": sum(1 for a in all_adrs if a.status == "NEEDS_DOCTOR_REVIEW"),
+            "reviewed": sum(1 for a in all_adrs if a.status == "REVIEWED"),
+        },
+        "reports": [
+            {
+                "adr_id": a.adr_id,
+                "medicine_name": a.medicine_name,
+                "reaction": a.reaction,
+                "severity": a.severity,
+                "timeline": a.timeline,
+                "status": a.status,
+                "batch_number": a.batch_number,
+                "patient_age_range": a.patient_age_range,
+                "created_at": a.created_at.isoformat() if a.created_at else None
+            }
+            for a in all_adrs
+        ]
     }
 
 

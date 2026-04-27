@@ -69,12 +69,6 @@ export default function DoctorDashboardPage() {
              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>View extracted clinical timelines and active medications.</p>
            </div>
          </Link>
-         <Link href="/doctor/lab-trends" style={{ textDecoration: 'none' }}>
-           <div className="glass-card" style={{ padding: '20px', cursor: 'pointer' }}>
-             <h4 style={{ color: '#c084fc', marginBottom: '8px' }}>📈 Lab Trends</h4>
-             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Analyze longitudinal test results and flags.</p>
-           </div>
-         </Link>
          <Link href="/doctor/prescription-verification" style={{ textDecoration: 'none' }}>
            <div className="glass-card" style={{ padding: '20px', cursor: 'pointer' }}>
              <h4 style={{ color: '#34d399', marginBottom: '8px' }}>✍️ e-Prescription Gen</h4>

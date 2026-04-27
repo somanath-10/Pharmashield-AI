@@ -12,16 +12,20 @@ logger = logging.getLogger(__name__)
 
 class QdrantVectorStore:
     def __init__(self):
-        settings = get_settings()
         self._available = False
-        self.collection_name = settings.qdrant_collection_name
+        self.client = None
+        self.settings = get_settings()
+        self.collection_name = self.settings.qdrant_collection_name
+        self._connect()
+
+    def _connect(self) -> None:
         try:
-            if settings.qdrant_url == ":memory:":
+            if self.settings.qdrant_url == ":memory:":
                 self.client = QdrantClient(location=":memory:")
             else:
                 self.client = QdrantClient(
-                    url=settings.qdrant_url,
-                    api_key=settings.qdrant_api_key or None,
+                    url=self.settings.qdrant_url,
+                    api_key=self.settings.qdrant_api_key or None,
                 )
             # Ensure collection exists
             collections = self.client.get_collections().collections
@@ -34,8 +38,12 @@ class QdrantVectorStore:
             self._available = True
         except Exception as e:
             logger.warning(f"Qdrant unavailable — vector search disabled: {e}")
+            self._available = False
+            self.client = None
 
     def insert_chunks(self, points: List[PointStruct]) -> None:
+        if not self._available:
+            self._connect()
         if not self._available:
             return
         try:
@@ -45,6 +53,8 @@ class QdrantVectorStore:
 
     def search(self, query_vector: List[float], case_id: str, limit: int = 5) -> List[Dict[str, Any]]:
         """Search Qdrant with case_id filter. Gracefully returns [] if unavailable."""
+        if not self._available:
+            self._connect()
         if not self._available:
             return []
         try:
