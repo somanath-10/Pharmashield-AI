@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_current_doctor
 from app.models.domain import (
     User, Case, ADRReport, DoctorReview,
-    DoctorPharmacistMessage, VerifiedPrescription
+    DoctorPharmacistMessage, VerifiedPrescription, CareTeamLink
 )
 from app.services.audit import record_audit_log
 from pydantic import BaseModel
@@ -35,20 +35,33 @@ async def get_doctor_dashboard(current_user: User = Depends(get_current_doctor))
 @router.get("/patients", response_model=List[Dict[str, Any]])
 async def get_patients(current_user: User = Depends(get_current_doctor)) -> Any:
     """
-    Get patient summaries derived from real PATIENT role cases in the system.
-    Returns structured summaries grouped by user_id.
+    Get patient summaries for patients that have an ACTIVE CareTeamLink with this doctor.
+    Falls back to all PATIENT cases when no links exist (dev/demo convenience).
     """
-    patient_cases = await Case.find(Case.role == "PATIENT").to_list()
+    # Check for consent-based links
+    links = await CareTeamLink.find(
+        {"doctor_id": current_user.user_id, "status": "ACTIVE"}
+    ).to_list()
+
+    if links:
+        patient_ids = [l.patient_id for l in links]
+        patient_cases = await Case.find({"user_id": {"$in": patient_ids}, "role": "PATIENT"}).to_list()
+    else:
+        # Demo/development fallback: show all patient cases
+        patient_cases = await Case.find({"role": "PATIENT"}).to_list()
+
     if not patient_cases:
         return []
 
-    # Group by user_id
     patient_map: Dict[str, Dict[str, Any]] = {}
     for case in patient_cases:
         uid = case.user_id
         if uid not in patient_map:
             patient_map[uid] = {
                 "patient_id": uid,
+                "name": "Patient",
+                "age": "—",
+                "current_medicines": [],
                 "cases": [],
                 "recent_flags": [],
             }
@@ -59,9 +72,7 @@ async def get_patients(current_user: User = Depends(get_current_doctor)) -> Any:
             "status": case.status.value if hasattr(case.status, "value") else case.status,
         })
         if case.risk_level in ("HIGH", "CRITICAL"):
-            patient_map[uid]["recent_flags"].append(
-                f"High-risk case: {case.title}"
-            )
+            patient_map[uid]["recent_flags"].append(f"High-risk case: {case.title}")
 
     return list(patient_map.values())
 
@@ -202,3 +213,57 @@ async def substitution_decision(
         "proposed": req.proposed_substitution,
         "reason": req.reason,
     }
+
+# ─── Care Team Links (Doctor-Patient Consent) ─────────────────────────────────
+
+class CareTeamLinkReq(BaseModel):
+    patient_id: str
+
+@router.post("/care-team-links")
+async def create_care_team_link(
+    req: CareTeamLinkReq,
+    current_user: User = Depends(get_current_doctor)
+) -> Any:
+    """Link a patient to this doctor (requires patient consent in full flow)."""
+    existing = await CareTeamLink.find_one(
+        {"doctor_id": current_user.user_id, "patient_id": req.patient_id, "status": "ACTIVE"}
+    )
+    if existing:
+        return {"link_id": existing.link_id, "status": "ALREADY_LINKED"}
+
+    link = CareTeamLink(
+        patient_id=req.patient_id,
+        doctor_id=current_user.user_id,
+        status="ACTIVE",
+        consent_given_at=datetime.now(timezone.utc),
+    )
+    await link.insert()
+    await record_audit_log(current_user.user_id, "DOCTOR", "CARE_TEAM_LINK_CREATED", "care_team",
+                           metadata={"patient_id": req.patient_id})
+    return {"link_id": link.link_id, "status": "ACTIVE"}
+
+@router.get("/care-team-links")
+async def get_care_team_links(current_user: User = Depends(get_current_doctor)) -> Any:
+    """List all patients linked to this doctor."""
+    links = await CareTeamLink.find(
+        {"doctor_id": current_user.user_id, "status": "ACTIVE"}
+    ).to_list()
+    return [{"link_id": l.link_id, "patient_id": l.patient_id, "status": l.status} for l in links]
+
+@router.delete("/care-team-links/{patient_id}")
+async def revoke_care_team_link(
+    patient_id: str,
+    current_user: User = Depends(get_current_doctor)
+) -> Any:
+    """Revoke a doctor-patient link."""
+    link = await CareTeamLink.find_one(
+        {"doctor_id": current_user.user_id, "patient_id": patient_id, "status": "ACTIVE"}
+    )
+    if not link:
+        raise HTTPException(status_code=404, detail="Care team link not found")
+    link.status = "REVOKED"
+    link.updated_at = datetime.now(timezone.utc)
+    await link.save()
+    await record_audit_log(current_user.user_id, "DOCTOR", "CARE_TEAM_LINK_REVOKED", "care_team",
+                           metadata={"patient_id": patient_id})
+    return {"status": "REVOKED"}

@@ -341,3 +341,16 @@ class DataSourceSyncStatus(Document):
 
     class Settings:
         name = "data_source_sync_status"
+
+class CareTeamLink(Document):
+    """Links a doctor to a patient with consent status. Controls which patients a doctor can view."""
+    link_id: Indexed(str) = Field(default_factory=uuid_str)
+    patient_id: Indexed(str)
+    doctor_id: Indexed(str)
+    status: str = "ACTIVE"  # ACTIVE | REVOKED | PENDING
+    consent_given_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    class Settings:
+        name = "care_team_links"

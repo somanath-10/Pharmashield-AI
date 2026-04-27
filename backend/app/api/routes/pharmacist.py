@@ -1,4 +1,4 @@
-from typing import List, Any
+from typing import List, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_current_pharmacist
 from app.models.domain import (
@@ -11,7 +11,25 @@ from pydantic import BaseModel
 
 router = APIRouter()
 
-# ─── Dispensing Decision Statuses ─────────────────────────────────────────────
+# ─── Case Validation Helper ────────────────────────────────────────────────────
+
+async def ensure_case_exists(case_id: Optional[str]) -> Optional[Case]:
+    """
+    Validate that a case exists when a case_id is supplied.
+    Pharmacist standalone tools (batch-check, price-check, etc.) may be run
+    without a case; if a case_id is provided it MUST exist.
+    """
+    if not case_id:
+        return None
+    case = await Case.find_one(Case.case_id == case_id)
+    if not case:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Case '{case_id}' not found. "
+                   "Please select a case from the review queue or omit case_id for standalone tool mode."
+        )
+    return case
+
 
 DISPENSING_STATUSES = {
     "CAN_DISPENSE": "Prescription verified and medicine is safe to dispense.",
@@ -44,7 +62,7 @@ async def get_review_queue(current_user: User = Depends(get_current_pharmacist))
     return await Case.find(Case.status == "NEEDS_REVIEW").to_list()
 
 class BatchCheckReq(BaseModel):
-    case_id: str
+    case_id: Optional[str] = None
     medicine_name: str
     batch_number: str
     expiry_date: str | None = None
@@ -54,6 +72,7 @@ class BatchCheckReq(BaseModel):
 @router.post("/batch-check", response_model=BatchVerification)
 async def perform_batch_check(req: BatchCheckReq, current_user: User = Depends(get_current_pharmacist)) -> Any:
     """Verify a batch and optionally flag it as quarantined."""
+    await ensure_case_exists(req.case_id)
     # Heuristic: any batch ending in 'X' matches mock NSQ spurious dataset seed
     is_spurious = req.batch_number.upper().endswith('X')
     
@@ -74,7 +93,7 @@ async def perform_batch_check(req: BatchCheckReq, current_user: User = Depends(g
     return batch
 
 class PriceCheckReq(BaseModel):
-    case_id: str
+    case_id: Optional[str] = None
     medicine_name: str
     mrp: float
     charged_price: float
@@ -82,6 +101,7 @@ class PriceCheckReq(BaseModel):
 @router.post("/price-check", response_model=PriceComplianceCheck)
 async def perform_price_check(req: PriceCheckReq, current_user: User = Depends(get_current_pharmacist)) -> Any:
     """Check for overpricing against MRP."""
+    await ensure_case_exists(req.case_id)
     is_overcharged = req.charged_price > req.mrp
     
     check = PriceComplianceCheck(
@@ -97,13 +117,14 @@ async def perform_price_check(req: PriceCheckReq, current_user: User = Depends(g
     return check
 
 class SubstitutionCheckReq(BaseModel):
-    case_id: str
+    case_id: Optional[str] = None
     prescribed_medicine: str
     substituted_medicine: str
 
 @router.post("/substitution-check", response_model=SubstitutionCheck)
 async def check_substitution(req: SubstitutionCheckReq, current_user: User = Depends(get_current_pharmacist)) -> Any:
     """Check if a generic substitution is safe (same molecule comparison)."""
+    await ensure_case_exists(req.case_id)
     is_safe = req.prescribed_medicine.split()[0].lower() == req.substituted_medicine.split()[0].lower()
     
     sub = SubstitutionCheck(
@@ -119,7 +140,7 @@ async def check_substitution(req: SubstitutionCheckReq, current_user: User = Dep
     return sub
 
 class ADRDraftReq(BaseModel):
-    case_id: str
+    case_id: Optional[str] = None
     patient_age_range: str | None = None
     medicine_name: str
     batch_number: str | None = None
@@ -130,6 +151,7 @@ class ADRDraftReq(BaseModel):
 @router.post("/adr-draft", response_model=ADRReport)
 async def create_adr_draft(req: ADRDraftReq, current_user: User = Depends(get_current_pharmacist)) -> Any:
     """Create an ADR report draft pending doctor review."""
+    await ensure_case_exists(req.case_id)
     adr = ADRReport(
         case_id=req.case_id,
         patient_age_range=req.patient_age_range,

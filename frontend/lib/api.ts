@@ -353,3 +353,42 @@ export interface Citation {
   source_snippet: string;
   source?: string;
 }
+
+// ─── Admin Extended Endpoints ─────────────────────────────────────────────────
+
+export const getAdminRiskQueues = () => req<any[]>('/api/admin/risk-queues');
+export const getAdminDataSources = () => req<any[]>('/api/admin/data-sources');
+export const getAdminModelQuality = () => req<any>('/api/admin/model-quality');
+export const getAdminBatchAnalytics = () => req<any>('/api/admin/analytics/batches');
+export const getAdminSellerAnalytics = () => req<any>('/api/admin/analytics/sellers');
+export const getAdminPriceAnalytics = () => req<any>('/api/admin/analytics/prices');
+export const getAdminADRMonitoring = () => req<any[]>('/api/admin/adr-monitoring');
+
+// ─── Pharmacist Dispensing Decision ──────────────────────────────────────────
+
+export async function recordDispensingDecision(data: {
+  case_id?: string;
+  medicine_name: string;
+  dispensing_status: string;
+  notes?: string;
+}): Promise<any> {
+  return req<any>('/api/pharmacist/dispensing-decision', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function getDispensingStatuses(): Promise<{ status: string; description: string }[]> {
+  return req('/api/pharmacist/dispensing-statuses');
+}
+
+// ─── Doctor Care Team Links ────────────────────────────────────────────────────
+
+export async function createCareTeamLink(patientId: string): Promise<any> {
+  return req('/api/doctor/care-team-links', { method: 'POST', body: JSON.stringify({ patient_id: patientId }) });
+}
+
+export async function getCareTeamLinks(): Promise<any[]> {
+  return req('/api/doctor/care-team-links');
+}
+
+export async function revokeCareTeamLink(patientId: string): Promise<any> {
+  return req(`/api/doctor/care-team-links/${patientId}`, { method: 'DELETE' });
+}

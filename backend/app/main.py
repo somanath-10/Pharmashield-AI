@@ -25,8 +25,9 @@ from app.db.postgres import init_postgres_db
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
-    await init_db()
-    await init_postgres_db()
+    if settings.app_env != "test":
+        await init_db()
+        await init_postgres_db()
     yield
 
 
